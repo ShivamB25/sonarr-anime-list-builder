@@ -1,0 +1,31 @@
+src/server/lib/sync.ts
+  899dfabebe7b6ae3 1-209
+src/server/db/schema.ts
+  899dfabebe7b6ae3 1,44-70
+src/server/routes/anime.ts
+  899dfabebe7b6ae3 2,4-6,36,38-39,41-51,55
+src/server/index.ts
+  899dfabebe7b6ae3 7,31,35
+src/server/lib/anilist.ts
+  899dfabebe7b6ae3 159-173
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "b11972372f03ba04aedfab8f43736a43727a35eb",
+  "prompts": {
+    "899dfabebe7b6ae3": {
+      "agent_id": {
+        "tool": "droid",
+        "id": "58743deb-80a6-4ad5-a6de-c652085b30a4",
+        "model": "custom:claude-sonnet-4-6"
+      },
+      "human_author": "shivam bansal",
+      "messages": [],
+      "total_additions": 274,
+      "total_deletions": 68,
+      "accepted_lines": 274,
+      "overriden_lines": 0
+    }
+  }
+}
