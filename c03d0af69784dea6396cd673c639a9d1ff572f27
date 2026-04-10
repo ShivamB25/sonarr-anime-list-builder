@@ -1,0 +1,23 @@
+src/server/lib/anilist.ts
+  899dfabebe7b6ae3 121,125,133
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "c03d0af69784dea6396cd673c639a9d1ff572f27",
+  "prompts": {
+    "899dfabebe7b6ae3": {
+      "agent_id": {
+        "tool": "droid",
+        "id": "58743deb-80a6-4ad5-a6de-c652085b30a4",
+        "model": "custom:claude-opus-4-6"
+      },
+      "human_author": "shivam bansal",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 2,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    }
+  }
+}
