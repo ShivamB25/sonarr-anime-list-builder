@@ -1,0 +1,35 @@
+src/server/lib/cache.ts
+  a524b29439d17bf1 1-2,9-12,15-17,19-28,33-48,52-104
+src/server/index.ts
+  a524b29439d17bf1 27-66
+src/client/pages/SeasonBrowser.tsx
+  a524b29439d17bf1 6,17,41-43,46-49,53-56,68,105-132,155-156,158
+src/server/routes/anime.ts
+  a524b29439d17bf1 3-4,28-52
+src/client/components/VirtualAnimeGrid.tsx
+  a524b29439d17bf1 1,13,24-30,34-35,38-46,51,53,81-84
+wrangler.toml
+  a524b29439d17bf1 14-16
+src/server/lib/anime-mapping.ts
+  a524b29439d17bf1 13-21,33-34,43,59
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "69989958f9ed815cf4b8196ca71c817a9da99c62",
+  "prompts": {
+    "a524b29439d17bf1": {
+      "agent_id": {
+        "tool": "droid",
+        "id": "e57cb51c-b243-4563-97f7-9d947fc4fec4",
+        "model": "custom:claude-sonnet-4-6"
+      },
+      "human_author": "shivam bansal",
+      "messages": [],
+      "total_additions": 277,
+      "total_deletions": 256,
+      "accepted_lines": 254,
+      "overriden_lines": 0
+    }
+  }
+}
