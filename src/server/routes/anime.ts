@@ -32,7 +32,7 @@ anime.get("/season-feed", async (c) => {
   );
 
   const sonarrEntries = await cachedWithStale(
-    `season-feed:${season}:${year}`,
+    `season-feed:v2:${season}:${year}`,
     3600,
     async () => {
       const allMedia = await getAllSeasonalAnime(season, year);
