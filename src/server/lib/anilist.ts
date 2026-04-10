@@ -118,10 +118,11 @@ export async function getAllSeasonalAnime(
   const key = `anilist:seasonal-all:${season}:${year}`;
   return cached(key, 3600, async () => {
     const perPage = 50;
+    const maxPages = 5; // safety cap ~250 anime max
     let page = 1;
     const allMedia: AniListMedia[] = [];
 
-    while (true) {
+    while (page <= maxPages) {
       const data = await gqlRequest(SEASONAL_QUERY, {
         season: season.toUpperCase(),
         seasonYear: year,
@@ -129,7 +130,7 @@ export async function getAllSeasonalAnime(
         perPage,
       });
       allMedia.push(...data.media);
-      if (!data.pageInfo.hasNextPage) break;
+      if (!data.pageInfo.hasNextPage || data.media.length === 0) break;
       page++;
     }
 
