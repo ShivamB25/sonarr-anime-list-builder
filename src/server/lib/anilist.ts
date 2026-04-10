@@ -156,3 +156,18 @@ export async function searchAnime(search: string, page = 1, perPage = 10) {
     gqlRequest(SEARCH_QUERY, { search, page, perPage })
   );
 }
+
+// Direct paginated fetch for the sync engine (no caching — cron handles freshness via D1)
+export async function gqlRequestPage(
+  season: string,
+  year: number,
+  page: number,
+  perPage: number
+) {
+  return gqlRequest(SEASONAL_QUERY, {
+    season: season.toUpperCase(),
+    seasonYear: year,
+    page,
+    perPage,
+  });
+}

@@ -1,8 +1,9 @@
 import { Hono } from "hono";
-import { getSeasonalAnime, getAllSeasonalAnime, searchAnime } from "../lib/anilist";
-import { getAllMALSeasonalAnime } from "../lib/mal";
-import { batchGetTvdbIds, batchGetTvdbIdsFromMal } from "../lib/anime-mapping";
+import { getSeasonalAnime, searchAnime } from "../lib/anilist";
 import { cachedWithStale } from "../lib/cache";
+import { drizzle } from "drizzle-orm/d1";
+import { eq, and } from "drizzle-orm";
+import { seasonFeedEntries } from "../db/schema";
 
 type Env = { Bindings: { DB: D1Database; MAL_CLIENT_ID: string } };
 
@@ -32,41 +33,26 @@ anime.get("/season-feed", async (c) => {
     c.req.query("year") ?? String(new Date().getFullYear())
   );
 
-  const malClientId = c.env.MAL_CLIENT_ID;
-
+  // Serve from D1 — always instant, cron keeps it populated
   const sonarrEntries = await cachedWithStale(
-    `season-feed:v3:${season}:${year}`,
-    3600,
+    `season-feed:d1:${season}:${year}`,
+    300, // 5 min in-memory cache; D1 is source of truth
     async () => {
-      const tvdbIds = new Set<number>();
-
-      // AniList source
-      try {
-        const anilistMedia = await getAllSeasonalAnime(season, year);
-        const anilistIds = anilistMedia.map((m) => m.id);
-        const anilistTvdbMap = await batchGetTvdbIds(anilistIds);
-        for (const tvdbId of anilistTvdbMap.values()) tvdbIds.add(tvdbId);
-      } catch {
-        // continue with MAL even if AniList fails
-      }
-
-      // MAL source
-      if (malClientId) {
-        try {
-          const malMedia = await getAllMALSeasonalAnime(season, year, malClientId);
-          const malIds = malMedia.map((m) => m.id);
-          const malTvdbMap = await batchGetTvdbIdsFromMal(malIds);
-          for (const tvdbId of malTvdbMap.values()) tvdbIds.add(tvdbId);
-        } catch {
-          // continue with AniList results even if MAL fails
-        }
-      }
-
-      return Array.from(tvdbIds).map((id) => ({ TvdbId: id }));
+      const db = drizzle(c.env.DB);
+      const rows = await db
+        .select({ tvdbId: seasonFeedEntries.tvdbId })
+        .from(seasonFeedEntries)
+        .where(
+          and(
+            eq(seasonFeedEntries.season, season),
+            eq(seasonFeedEntries.year, year)
+          )
+        );
+      return rows.map((r) => ({ TvdbId: r.tvdbId }));
     }
   );
 
-  c.header("Cache-Control", "public, max-age=3600, s-maxage=3600");
+  c.header("Cache-Control", "public, max-age=300, s-maxage=300");
   return c.json(sonarrEntries);
 });
 
