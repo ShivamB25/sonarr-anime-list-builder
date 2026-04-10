@@ -1,0 +1,13 @@
+name = "airing-list-web"
+main = "src/server/index.ts"
+compatibility_date = "2025-04-01"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = "dist/client"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "airing-list-db"
+database_id = "771d56c0-5874-4fe0-9d84-c2e1e03216f1"
+migrations_dir = "drizzle"
