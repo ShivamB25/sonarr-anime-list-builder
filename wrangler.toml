@@ -11,3 +11,6 @@ binding = "DB"
 database_name = "airing-list-db"
 database_id = "771d56c0-5874-4fe0-9d84-c2e1e03216f1"
 migrations_dir = "drizzle"
+
+[triggers]
+crons = ["0 * * * *", "30 * * * *"]

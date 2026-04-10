@@ -3,6 +3,7 @@ import { api, type AnimeMedia, type User } from "../api";
 import { useSeasons } from "../hooks";
 import VirtualAnimeGrid from "../components/VirtualAnimeGrid";
 import AddToListModal from "../components/AddToListModal";
+import CopyUrlBar from "../components/CopyUrlBar";
 
 type Props = { user: User | null };
 
@@ -13,6 +14,7 @@ export default function SeasonBrowser({ user: _user }: Props) {
   const [anime, setAnime] = useState<AnimeMedia[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [hasNext, setHasNext] = useState(false);
   const [search, setSearch] = useState("");
   const [addTarget, setAddTarget] = useState<AnimeMedia | null>(null);
@@ -36,18 +38,22 @@ export default function SeasonBrowser({ user: _user }: Props) {
     }
   }, [season, year, search]);
 
-  function loadMore() {
+  async function loadMore() {
+    if (loadingMore) return;
+    setLoadingMore(true);
     const nextPage = page + 1;
-    setPage(nextPage);
 
-    const fetcher = search.trim()
-      ? api.anime.search(search.trim(), nextPage)
-      : api.anime.seasonal(season, year, nextPage);
+    try {
+      const data = search.trim()
+        ? await api.anime.search(search.trim(), nextPage)
+        : await api.anime.seasonal(season, year, nextPage);
 
-    fetcher.then((data) => {
       setAnime((prev) => [...prev, ...data.media]);
       setHasNext(data.pageInfo.hasNextPage);
-    });
+      setPage((prev) => prev + 1);
+    } finally {
+      setLoadingMore(false);
+    }
   }
 
   const seasonLabels: Record<string, string> = {
@@ -59,7 +65,7 @@ export default function SeasonBrowser({ user: _user }: Props) {
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row gap-4 mb-6">
+      <div className="flex flex-col lg:flex-row gap-4 mb-6">
         <input
           type="text"
           placeholder="Search anime..."
@@ -96,9 +102,34 @@ export default function SeasonBrowser({ user: _user }: Props) {
       </div>
 
       {!search && (
-        <h1 className="text-2xl font-bold mb-6">
-          {seasonLabels[season]} {year}
-        </h1>
+        <>
+          <div className="mb-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,34rem)]">
+            <div className="rounded-2xl border border-white/8 bg-[var(--bg-secondary)]/70 p-5">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--accent)]/15 text-[var(--accent)]">
+                  <span className="text-lg">TV</span>
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold">
+                    {seasonLabels[season]} {year}
+                  </h1>
+                  <p className="text-sm text-[var(--text-secondary)]">
+                    Browse current picks, add anime to your own list, or copy the full season feed for Sonarr.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-white/8 bg-[var(--bg-secondary)]/70 p-5">
+              <p className="text-sm font-medium mb-2">Sonarr URL for this season</p>
+              <CopyUrlBar
+                url={`${window.location.origin}/api/anime/season-feed?season=${season}&year=${year}`}
+              />
+              <p className="text-[11px] text-[var(--text-secondary)] mt-2 leading-relaxed">
+                Paste this into Sonarr → Import Lists → Custom List → List URL to import the currently selected season.
+              </p>
+            </div>
+          </div>
+        </>
       )}
       {search && (
         <h1 className="text-2xl font-bold mb-6">
@@ -121,9 +152,10 @@ export default function SeasonBrowser({ user: _user }: Props) {
             <div className="flex justify-center mt-8">
               <button
                 onClick={loadMore}
-                className="px-6 py-2 bg-[var(--bg-secondary)] hover:bg-white/10 border border-white/10 rounded-lg transition"
+                disabled={loadingMore}
+                className="px-6 py-2 bg-[var(--bg-secondary)] hover:bg-white/10 border border-white/10 rounded-lg transition disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Load More
+                {loadingMore ? "Loading..." : "Load More"}
               </button>
             </div>
           )}
