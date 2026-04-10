@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import { api, type ListDetail as ListDetailType } from "../api";
+import CopyUrlBar from "../components/CopyUrlBar";
 
 type Props = { listId: string; onBack: () => void };
 
 export default function ListDetail({ listId, onBack }: Props) {
   const [list, setList] = useState<ListDetailType | null>(null);
   const [loading, setLoading] = useState(true);
-  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     api.lists.get(listId).then((l) => {
@@ -22,15 +22,7 @@ export default function ListDetail({ listId, onBack }: Props) {
     );
   }
 
-  function getSonarrUrl() {
-    return `${window.location.origin}/api/lists/${listId}/sonarr`;
-  }
-
-  async function copyUrl() {
-    await navigator.clipboard.writeText(getSonarrUrl());
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
+  const sonarrUrl = `${window.location.origin}/api/lists/${listId}/sonarr`;
 
   if (loading) {
     return (
@@ -57,29 +49,19 @@ export default function ListDetail({ listId, onBack }: Props) {
         &larr; Back to Lists
       </button>
 
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <h1 className="text-2xl font-bold">{list.name}</h1>
-        <div className="flex flex-col sm:items-end gap-2">
-          <button
-            onClick={copyUrl}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium transition"
-          >
-            {copied ? "Copied!" : "Copy Sonarr Import URL"}
-          </button>
-          <p className="text-xs text-[var(--text-secondary)] max-w-xs text-right">
-            Paste this URL into Sonarr &rarr; Import Lists &rarr; Custom List
-            &rarr; List URL
-          </p>
-        </div>
-      </div>
+      <h1 className="text-2xl font-bold mb-4">{list.name}</h1>
 
-      <div className="mb-6 p-3 bg-[var(--bg-secondary)] rounded-lg border border-white/10">
-        <p className="text-xs text-[var(--text-secondary)] mb-1">
-          Sonarr List URL:
+      <div className="mb-6 p-4 bg-[var(--bg-secondary)] rounded-xl border border-white/10 space-y-2">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-medium">Sonarr Import URL</p>
+          <span className="text-[10px] px-2 py-0.5 bg-green-600/20 text-green-400 rounded">
+            {list.items.length} {list.items.length === 1 ? "title" : "titles"}
+          </span>
+        </div>
+        <CopyUrlBar url={sonarrUrl} />
+        <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
+          Sonarr &rarr; Settings &rarr; Import Lists &rarr; + &rarr; Custom List &rarr; paste this URL into <strong>List URL</strong>. Sonarr will auto-import all titles from this list.
         </p>
-        <code className="text-xs text-[var(--accent)] break-all select-all">
-          {getSonarrUrl()}
-        </code>
       </div>
 
       {list.items.length === 0 ? (

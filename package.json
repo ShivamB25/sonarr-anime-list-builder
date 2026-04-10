@@ -14,9 +14,10 @@
     "db:studio": "bunx drizzle-kit studio"
   },
   "dependencies": {
-    "hono": "^4.7.6",
+    "@chenglou/pretext": "^0.0.5",
+    "bcryptjs": "^3.0.2",
     "drizzle-orm": "^0.41.0",
-    "bcryptjs": "^3.0.2"
+    "hono": "^4.7.6"
   },
   "devDependencies": {
     "typescript": "^5.8.3",

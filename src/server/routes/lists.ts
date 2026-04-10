@@ -3,7 +3,7 @@ import { drizzle } from "drizzle-orm/d1";
 import { eq, and } from "drizzle-orm";
 import { lists, listItems } from "../db/schema";
 import { getOrCreateGuest } from "../lib/auth";
-import { getIdsFromAnilist } from "../lib/anime-mapping";
+import { batchGetTvdbIds } from "../lib/anime-mapping";
 
 type Env = { Bindings: { DB: D1Database; SESSION_SECRET: string } };
 
@@ -138,6 +138,8 @@ listsRouter.delete("/:id/items/:itemId", async (c) => {
   return c.json({ ok: true });
 });
 
+import { cached } from "../lib/cache";
+
 // Public Sonarr-compatible feed -- no auth required
 // Returns [{ "TvdbId": 12345 }, ...] for Sonarr Custom Import List
 listsRouter.get("/:id/sonarr", async (c) => {
@@ -157,13 +159,13 @@ listsRouter.get("/:id/sonarr", async (c) => {
     .from(listItems)
     .where(eq(listItems.listId, listId));
 
-  const sonarrEntries: { TvdbId: number }[] = [];
+  const anilistIds = items.map((i) => i.anilistId);
+  const tvdbMap = await batchGetTvdbIds(anilistIds);
 
-  for (const item of items) {
-    const ids = await getIdsFromAnilist(item.anilistId);
-    if (ids.tvdbId) {
-      sonarrEntries.push({ TvdbId: ids.tvdbId });
-    }
+  const sonarrEntries: { TvdbId: number }[] = [];
+  for (const id of anilistIds) {
+    const tvdbId = tvdbMap.get(id);
+    if (tvdbId) sonarrEntries.push({ TvdbId: tvdbId });
   }
 
   c.header("Cache-Control", "public, max-age=3600, s-maxage=3600");

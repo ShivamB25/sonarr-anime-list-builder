@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { api, type List } from "../api";
+import CopyUrlBar from "../components/CopyUrlBar";
 
 type Props = { onOpenList: (id: string) => void };
 
@@ -15,6 +16,7 @@ export default function MyLists({ onOpenList }: Props) {
   const [loading, setLoading] = useState(true);
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   useEffect(() => {
     api.lists.getAll().then((l) => {
@@ -38,19 +40,18 @@ export default function MyLists({ onOpenList }: Props) {
   async function deleteList(id: string) {
     await api.lists.delete(id);
     setLists((prev) => prev.filter((l) => l.id !== id));
+    if (expanded === id) setExpanded(null);
   }
 
-  function copySonarrUrl(id: string) {
-    const url = `${window.location.origin}/api/lists/${id}/sonarr`;
-    navigator.clipboard.writeText(url);
+  function sonarrUrl(id: string) {
+    return `${window.location.origin}/api/lists/${id}/sonarr`;
   }
 
   return (
     <div>
       <h1 className="text-2xl font-bold mb-2">My Lists</h1>
       <p className="text-sm text-[var(--text-secondary)] mb-6">
-        Each list has a Sonarr-compatible URL. Add it in Sonarr under Import
-        Lists &rarr; Custom List.
+        Each list has a Sonarr-compatible URL. Click the link icon to reveal it.
       </p>
 
       <div className="flex gap-2 mb-6">
@@ -87,42 +88,51 @@ export default function MyLists({ onOpenList }: Props) {
       ) : (
         <div className="grid gap-3">
           {lists.map((l) => (
-            <div
-              key={l.id}
-              className="flex items-center justify-between bg-[var(--bg-secondary)] rounded-lg p-4 hover:ring-1 hover:ring-white/20 transition cursor-pointer"
-              onClick={() => onOpenList(l.id)}
-            >
-              <div className="flex items-center gap-3">
-                <div>
-                  <h3 className="font-medium">{l.name}</h3>
+            <div key={l.id} className="bg-[var(--bg-secondary)] rounded-lg overflow-hidden">
+              <div
+                className="flex items-center justify-between p-4 hover:bg-white/[0.03] transition cursor-pointer"
+                onClick={() => onOpenList(l.id)}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <h3 className="font-medium truncate">{l.name}</h3>
+                  {l.season && l.year && (
+                    <span className="shrink-0 text-xs px-2 py-0.5 bg-[var(--accent)]/20 text-[var(--accent)] rounded">
+                      {SEASON_LABELS[l.season] ?? l.season} {l.year}
+                    </span>
+                  )}
                 </div>
-                {l.season && l.year && (
-                  <span className="text-xs px-2 py-0.5 bg-[var(--accent)]/20 text-[var(--accent)] rounded">
-                    {SEASON_LABELS[l.season] ?? l.season} {l.year}
-                  </span>
-                )}
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setExpanded(expanded === l.id ? null : l.id);
+                    }}
+                    className="p-1.5 rounded hover:bg-white/10 transition"
+                    title="Show Sonarr URL"
+                  >
+                    <svg className="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (confirm(`Delete "${l.name}"?`)) deleteList(l.id);
+                    }}
+                    className="p-1.5 rounded hover:bg-white/10 transition"
+                    title="Delete list"
+                  >
+                    <svg className="w-4 h-4 text-[var(--text-secondary)] hover:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    copySonarrUrl(l.id);
-                  }}
-                  className="text-xs px-2 py-1 bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 rounded transition"
-                  title="Copy Sonarr URL"
-                >
-                  Copy URL
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (confirm(`Delete "${l.name}"?`)) deleteList(l.id);
-                  }}
-                  className="text-xs px-2 py-1 text-[var(--text-secondary)] hover:text-red-400 transition"
-                >
-                  Delete
-                </button>
-              </div>
+              {expanded === l.id && (
+                <div className="px-4 pb-4 pt-0">
+                  <CopyUrlBar url={sonarrUrl(l.id)} compact />
+                </div>
+              )}
             </div>
           ))}
         </div>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { api, type AnimeMedia, type User } from "../api";
 import { useSeasons } from "../hooks";
-import AnimeCard from "../components/AnimeCard";
+import VirtualAnimeGrid from "../components/VirtualAnimeGrid";
 import AddToListModal from "../components/AddToListModal";
 
 type Props = { user: User | null };
@@ -116,11 +116,7 @@ export default function SeasonBrowser({ user: _user }: Props) {
         </p>
       ) : (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {anime.map((a) => (
-              <AnimeCard key={a.id} anime={a} onAdd={setAddTarget} />
-            ))}
-          </div>
+          <VirtualAnimeGrid anime={anime} onAdd={setAddTarget} />
           {hasNext && (
             <div className="flex justify-center mt-8">
               <button

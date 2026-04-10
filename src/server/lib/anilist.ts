@@ -92,20 +92,28 @@ async function gqlRequest(query: string, variables: Record<string, unknown>) {
   return json.data.Page;
 }
 
+import { cached } from "./cache";
+
 export async function getSeasonalAnime(
   season: string,
   year: number,
   page = 1,
   perPage = 25
 ) {
-  return gqlRequest(SEASONAL_QUERY, {
-    season: season.toUpperCase(),
-    seasonYear: year,
-    page,
-    perPage,
-  });
+  const key = `anilist:seasonal:${season}:${year}:${page}:${perPage}`;
+  return cached(key, 3600, () =>
+    gqlRequest(SEASONAL_QUERY, {
+      season: season.toUpperCase(),
+      seasonYear: year,
+      page,
+      perPage,
+    })
+  );
 }
 
 export async function searchAnime(search: string, page = 1, perPage = 10) {
-  return gqlRequest(SEARCH_QUERY, { search, page, perPage });
+  const key = `anilist:search:${encodeURIComponent(search)}:${page}:${perPage}`;
+  return cached(key, 1800, () =>
+    gqlRequest(SEARCH_QUERY, { search, page, perPage })
+  );
 }
