@@ -1,0 +1,29 @@
+src/server/routes/anime.ts
+  899dfabebe7b6ae3 3-4,7,35-36,38,41-50,52-65
+src/server/lib/mal.ts
+  899dfabebe7b6ae3 1-40
+src/server/index.ts
+  899dfabebe7b6ae3 8
+src/server/lib/anime-mapping.ts
+  899dfabebe7b6ae3 13-14,18-20,27-29,31-32,36,44-45,60,63-77
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "c523603456210b747a1df81743e5fa050a78a885",
+  "prompts": {
+    "899dfabebe7b6ae3": {
+      "agent_id": {
+        "tool": "droid",
+        "id": "58743deb-80a6-4ad5-a6de-c652085b30a4",
+        "model": "custom:claude-sonnet-4-6"
+      },
+      "human_author": "shivam bansal",
+      "messages": [],
+      "total_additions": 100,
+      "total_deletions": 27,
+      "accepted_lines": 100,
+      "overriden_lines": 0
+    }
+  }
+}
