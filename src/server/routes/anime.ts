@@ -1,9 +1,10 @@
 import { Hono } from "hono";
 import { getSeasonalAnime, getAllSeasonalAnime, searchAnime } from "../lib/anilist";
-import { batchGetTvdbIds } from "../lib/anime-mapping";
+import { getAllMALSeasonalAnime } from "../lib/mal";
+import { batchGetTvdbIds, batchGetTvdbIdsFromMal } from "../lib/anime-mapping";
 import { cachedWithStale } from "../lib/cache";
 
-type Env = { Bindings: { DB: D1Database } };
+type Env = { Bindings: { DB: D1Database; MAL_CLIENT_ID: string } };
 
 const anime = new Hono<Env>();
 
@@ -31,20 +32,37 @@ anime.get("/season-feed", async (c) => {
     c.req.query("year") ?? String(new Date().getFullYear())
   );
 
+  const malClientId = c.env.MAL_CLIENT_ID;
+
   const sonarrEntries = await cachedWithStale(
-    `season-feed:v2:${season}:${year}`,
+    `season-feed:v3:${season}:${year}`,
     3600,
     async () => {
-      const allMedia = await getAllSeasonalAnime(season, year);
-      const anilistIds = allMedia.map((m) => m.id);
-      const tvdbMap = await batchGetTvdbIds(anilistIds);
+      const tvdbIds = new Set<number>();
 
-      const entries: { TvdbId: number }[] = [];
-      for (const id of anilistIds) {
-        const tvdbId = tvdbMap.get(id);
-        if (tvdbId) entries.push({ TvdbId: tvdbId });
+      // AniList source
+      try {
+        const anilistMedia = await getAllSeasonalAnime(season, year);
+        const anilistIds = anilistMedia.map((m) => m.id);
+        const anilistTvdbMap = await batchGetTvdbIds(anilistIds);
+        for (const tvdbId of anilistTvdbMap.values()) tvdbIds.add(tvdbId);
+      } catch {
+        // continue with MAL even if AniList fails
       }
-      return entries;
+
+      // MAL source
+      if (malClientId) {
+        try {
+          const malMedia = await getAllMALSeasonalAnime(season, year, malClientId);
+          const malIds = malMedia.map((m) => m.id);
+          const malTvdbMap = await batchGetTvdbIdsFromMal(malIds);
+          for (const tvdbId of malTvdbMap.values()) tvdbIds.add(tvdbId);
+        } catch {
+          // continue with AniList results even if MAL fails
+        }
+      }
+
+      return Array.from(tvdbIds).map((id) => ({ TvdbId: id }));
     }
   );
 

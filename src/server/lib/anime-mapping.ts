@@ -10,29 +10,30 @@ type MappingEntry = {
   mal_id?: number;
 };
 
-let mappingCache: Map<number, MappingEntry> | null = null;
+let byAnilist: Map<number, MappingEntry> | null = null;
+let byMal: Map<number, MappingEntry> | null = null;
 let cacheTimestamp = 0;
 const CACHE_TTL = 1000 * 60 * 60 * 6; // 6 hours
 
-async function loadMappings(): Promise<Map<number, MappingEntry>> {
-  if (mappingCache && Date.now() - cacheTimestamp < CACHE_TTL) {
-    return mappingCache;
+async function loadMappings(): Promise<{ byAnilist: Map<number, MappingEntry>; byMal: Map<number, MappingEntry> }> {
+  if (byAnilist && byMal && Date.now() - cacheTimestamp < CACHE_TTL) {
+    return { byAnilist, byMal };
   }
 
   const res = await fetch(MAPPING_URL);
   if (!res.ok) throw new Error(`Failed to fetch mapping: ${res.status}`);
   const data = (await res.json()) as MappingEntry[];
 
-  const map = new Map<number, MappingEntry>();
+  byAnilist = new Map<number, MappingEntry>();
+  byMal = new Map<number, MappingEntry>();
+
   for (const entry of data) {
-    if (entry.anilist_id) {
-      map.set(entry.anilist_id, entry);
-    }
+    if (entry.anilist_id) byAnilist.set(entry.anilist_id, entry);
+    if (entry.mal_id) byMal.set(entry.mal_id, entry);
   }
 
-  mappingCache = map;
   cacheTimestamp = Date.now();
-  return map;
+  return { byAnilist, byMal };
 }
 
 export async function getIdsFromAnilist(
@@ -40,8 +41,8 @@ export async function getIdsFromAnilist(
 ): Promise<{ tvdbId: number | null; tmdbId: number | null; malId: number | null }> {
   return cached(`mapping:${anilistId}`, 21600, async () => {
     try {
-      const map = await loadMappings();
-      const entry = map.get(anilistId);
+      const { byAnilist } = await loadMappings();
+      const entry = byAnilist.get(anilistId);
       return {
         tvdbId: entry?.tvdb_id ?? null,
         tmdbId: entry?.themoviedb_id ?? null,
@@ -56,10 +57,24 @@ export async function getIdsFromAnilist(
 export async function batchGetTvdbIds(
   anilistIds: number[]
 ): Promise<Map<number, number>> {
-  const map = await loadMappings();
+  const { byAnilist } = await loadMappings();
   const result = new Map<number, number>();
   for (const id of anilistIds) {
-    const entry = map.get(id);
+    const entry = byAnilist.get(id);
+    if (entry?.tvdb_id) {
+      result.set(id, entry.tvdb_id);
+    }
+  }
+  return result;
+}
+
+export async function batchGetTvdbIdsFromMal(
+  malIds: number[]
+): Promise<Map<number, number>> {
+  const { byMal } = await loadMappings();
+  const result = new Map<number, number>();
+  for (const id of malIds) {
+    const entry = byMal.get(id);
     if (entry?.tvdb_id) {
       result.set(id, entry.tvdb_id);
     }

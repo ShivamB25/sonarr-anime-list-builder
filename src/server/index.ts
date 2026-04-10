@@ -5,7 +5,7 @@ import authRoutes from "./routes/auth";
 import animeRoutes from "./routes/anime";
 import listsRoutes from "./routes/lists";
 
-type Env = { Bindings: { DB: D1Database; SESSION_SECRET: string } };
+type Env = { Bindings: { DB: D1Database; SESSION_SECRET: string; MAL_CLIENT_ID: string } };
 
 const app = new Hono<Env>();
 
