@@ -88,7 +88,7 @@ async function gqlRequest(query: string, variables: Record<string, unknown>) {
     body: JSON.stringify({ query, variables }),
   });
   if (!res.ok) throw new Error(`AniList API error: ${res.status}`);
-  const json = (await res.json()) as { data: { Page: { pageInfo: unknown; media: AniListMedia[] } } };
+  const json = (await res.json()) as { data: { Page: { pageInfo: { hasNextPage: boolean; currentPage: number; lastPage: number; total: number }; media: AniListMedia[] } } };
   return json.data.Page;
 }
 
@@ -109,6 +109,32 @@ export async function getSeasonalAnime(
       perPage,
     })
   );
+}
+
+export async function getAllSeasonalAnime(
+  season: string,
+  year: number
+): Promise<AniListMedia[]> {
+  const key = `anilist:seasonal-all:${season}:${year}`;
+  return cached(key, 3600, async () => {
+    const perPage = 50;
+    let page = 1;
+    const allMedia: AniListMedia[] = [];
+
+    while (true) {
+      const data = await gqlRequest(SEASONAL_QUERY, {
+        season: season.toUpperCase(),
+        seasonYear: year,
+        page,
+        perPage,
+      });
+      allMedia.push(...data.media);
+      if (!data.pageInfo.hasNextPage) break;
+      page++;
+    }
+
+    return allMedia;
+  });
 }
 
 export async function searchAnime(search: string, page = 1, perPage = 10) {

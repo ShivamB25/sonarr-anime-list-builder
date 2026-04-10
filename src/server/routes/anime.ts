@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { getSeasonalAnime, searchAnime } from "../lib/anilist";
+import { getSeasonalAnime, getAllSeasonalAnime, searchAnime } from "../lib/anilist";
 import { batchGetTvdbIds } from "../lib/anime-mapping";
 import { cachedWithStale } from "../lib/cache";
 
@@ -35,8 +35,8 @@ anime.get("/season-feed", async (c) => {
     `season-feed:${season}:${year}`,
     3600,
     async () => {
-      const data = await getSeasonalAnime(season, year, 1, 100);
-      const anilistIds = data.media.map((m) => m.id);
+      const allMedia = await getAllSeasonalAnime(season, year);
+      const anilistIds = allMedia.map((m) => m.id);
       const tvdbMap = await batchGetTvdbIds(anilistIds);
 
       const entries: { TvdbId: number }[] = [];
