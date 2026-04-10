@@ -79,17 +79,29 @@ export type AniListMedia = {
 };
 
 async function gqlRequest(query: string, variables: Record<string, unknown>) {
-  const res = await fetch(ANILIST_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify({ query, variables }),
-  });
-  if (!res.ok) throw new Error(`AniList API error: ${res.status}`);
-  const json = (await res.json()) as { data: { Page: { pageInfo: { hasNextPage: boolean; currentPage: number; lastPage: number; total: number }; media: AniListMedia[] } } };
-  return json.data.Page;
+  const maxRetries = 3;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const res = await fetch(ANILIST_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({ query, variables }),
+    });
+
+    if (res.status === 429 && attempt < maxRetries) {
+      const retryAfter = parseInt(res.headers.get("Retry-After") ?? "0");
+      const delay = Math.max(retryAfter * 1000, 1000 * (attempt + 1));
+      await new Promise((r) => setTimeout(r, delay));
+      continue;
+    }
+
+    if (!res.ok) throw new Error(`AniList API error: ${res.status}`);
+    const json = (await res.json()) as { data: { Page: { pageInfo: { hasNextPage: boolean; currentPage: number; lastPage: number; total: number }; media: AniListMedia[] } } };
+    return json.data.Page;
+  }
+  throw new Error("AniList API: max retries exceeded");
 }
 
 import { cached } from "./cache";

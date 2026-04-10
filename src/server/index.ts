@@ -45,13 +45,15 @@ async function warmSeasonFeeds() {
     targets.add(`${season}:${currentYear - 1}`);
   }
 
-  await Promise.all(
-    Array.from(targets).map(async (target) => {
-      const [season, year] = target.split(":");
-      const url = `https://airing-list-web.edge-5af.workers.dev/api/anime/season-feed?season=${season}&year=${year}`;
+  for (const target of targets) {
+    const [season, year] = target.split(":");
+    const url = `https://airing-list-web.edge-5af.workers.dev/api/anime/season-feed?season=${season}&year=${year}`;
+    try {
       await fetch(url, { cf: { cacheTtl: 3600, cacheEverything: true } });
-    })
-  );
+    } catch {
+      // continue warming other seasons even if one fails
+    }
+  }
 }
 
 export default {
