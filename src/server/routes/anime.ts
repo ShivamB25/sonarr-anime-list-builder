@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { getSeasonalAnime, searchAnime } from "../lib/anilist";
+import { cachedWithStale } from "../lib/cache";
 import { drizzle } from "drizzle-orm/d1";
 import { eq, and, sql } from "drizzle-orm";
 import { seasonFeedEntries } from "../db/schema";
@@ -32,19 +33,25 @@ anime.get("/season-feed", async (c) => {
     c.req.query("year") ?? String(new Date().getFullYear())
   );
 
-  // Serve from D1 — always instant, cron keeps it populated
-  const db = drizzle(c.env.DB);
-  const rows = await db.run(
-    sql`
-      SELECT DISTINCT tvdb_id
-      FROM season_feed_entries
-      WHERE season = ${season}
-        AND year = ${year}
-      ORDER BY tvdb_id
-    `
-  );
+  // D1 is source of truth; keep only a tiny cache as a read accelerator.
+  const sonarrEntries = await cachedWithStale(
+    `season-feed:d1:${season}:${year}`,
+    60,
+    async () => {
+      const db = drizzle(c.env.DB);
+      const rows = await db.run(
+        sql`
+          SELECT DISTINCT tvdb_id
+          FROM season_feed_entries
+          WHERE season = ${season}
+            AND year = ${year}
+          ORDER BY tvdb_id
+        `
+      );
 
-  const sonarrEntries = rows.results.map((r) => ({ TvdbId: Number(r.tvdb_id) }));
+      return rows.results.map((r) => ({ TvdbId: Number(r.tvdb_id) }));
+    }
+  );
 
   c.header("Cache-Control", "public, max-age=60, s-maxage=60");
   return c.json(sonarrEntries);
