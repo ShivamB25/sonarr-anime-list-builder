@@ -1,20 +1,96 @@
 import { Hono } from "hono";
-import { getSeasonalAnime, searchAnime } from "../lib/anilist";
+import { searchAnime } from "../lib/anilist";
 import { cachedWithStale } from "../lib/cache";
 import { drizzle } from "drizzle-orm/d1";
 import { eq, and, sql } from "drizzle-orm";
-import { seasonFeedEntries } from "../db/schema";
+import { seasonFeedEntries, seasonalBrowseItems } from "../db/schema";
 
 type Env = { Bindings: { DB: D1Database; MAL_CLIENT_ID: string } };
 
 const anime = new Hono<Env>();
 
 anime.get("/seasonal", async (c) => {
-  const season = c.req.query("season") ?? getCurrentSeason();
+  const season = (c.req.query("season") ?? getCurrentSeason()).toUpperCase();
   const year = parseInt(c.req.query("year") ?? String(new Date().getFullYear()));
   const page = parseInt(c.req.query("page") ?? "1");
+  const pageSize = 25;
 
-  const data = await getSeasonalAnime(season, year, page);
+  const data = await cachedWithStale(
+    `seasonal:browse:${season}:${year}:${page}`,
+    60,
+    async () => {
+      const db = drizzle(c.env.DB);
+      const rows = await db
+        .select()
+        .from(seasonalBrowseItems)
+        .where(
+          and(
+            eq(seasonalBrowseItems.season, season),
+            eq(seasonalBrowseItems.year, year),
+            eq(seasonalBrowseItems.page, page)
+          )
+        )
+        .orderBy(seasonalBrowseItems.sortOrder);
+
+      const countResult = await db.run(
+        sql`
+          SELECT COUNT(*) as count
+          FROM seasonal_browse_items
+          WHERE season = ${season}
+            AND year = ${year}
+        `
+      );
+
+      const total = Number(countResult.results[0]?.count ?? 0);
+      const media = rows.map((r) => ({
+        id: r.anilistId,
+        title: {
+          romaji: r.titleRomaji,
+          english: r.titleEnglish,
+          native: r.titleNative,
+        },
+        coverImage: {
+          large: r.coverImageLarge,
+          medium: r.coverImageMedium,
+        },
+        bannerImage: r.bannerImage,
+        format: r.format,
+        status: r.status,
+        episodes: r.episodes,
+        averageScore: r.averageScore,
+        genres: JSON.parse(r.genresJson) as string[],
+        season: r.seasonValue,
+        seasonYear: r.seasonYear,
+        description: r.description,
+        nextAiringEpisode: r.nextAiringAt
+          ? {
+              airingAt: r.nextAiringAt,
+              episode: r.nextAiringEpisode!,
+              timeUntilAiring: r.nextAiringTimeUntil!,
+            }
+          : null,
+        startDate: {
+          year: r.startYear,
+          month: r.startMonth,
+          day: r.startDay,
+        },
+        studios: {
+          nodes: JSON.parse(r.studiosJson) as { name: string }[],
+        },
+      }));
+
+      return {
+        pageInfo: {
+          hasNextPage: page * pageSize < total,
+          currentPage: page,
+          lastPage: Math.max(1, Math.ceil(total / pageSize)),
+          total,
+        },
+        media,
+      };
+    }
+  );
+
   return c.json(data);
 });
 

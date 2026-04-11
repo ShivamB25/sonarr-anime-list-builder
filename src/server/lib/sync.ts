@@ -1,11 +1,12 @@
 import { drizzle } from "drizzle-orm/d1";
 import { eq, and, sql } from "drizzle-orm";
-import { seasonFeedEntries, seasonFeedSync } from "../db/schema";
+import { seasonFeedEntries, seasonFeedSync, seasonalBrowseItems } from "../db/schema";
 import { gqlRequestPage } from "./anilist";
 import { getAllMALSeasonalAnime } from "./mal";
 import { batchGetTvdbIds, batchGetTvdbIdsFromMal } from "./anime-mapping";
 
 const ANILIST_PER_PAGE = 50;
+const BROWSE_PAGE_SIZE = 25;
 // Reset done=0 after 24h so each season re-syncs daily
 const RESYNC_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
@@ -90,6 +91,129 @@ async function cleanupSourceRows(
   );
 }
 
+async function upsertBrowseItems(
+  db: ReturnType<typeof drizzle>,
+  season: string,
+  year: number,
+  syncRunAt: number,
+  media: {
+    id: number;
+    title: { romaji: string; english: string | null; native: string | null };
+    coverImage: { large: string; medium: string };
+    bannerImage: string | null;
+    format: string;
+    status: string;
+    episodes: number | null;
+    averageScore: number | null;
+    genres: string[];
+    season: string;
+    seasonYear: number;
+    description: string | null;
+    nextAiringEpisode: {
+      airingAt: number;
+      episode: number;
+      timeUntilAiring: number;
+    } | null;
+    startDate: { year: number; month: number; day: number };
+    studios: { nodes: { name: string }[] };
+  }[]
+): Promise<void> {
+  if (media.length === 0) return;
+  const now = Date.now();
+  const chunkSize = 25;
+
+  for (let i = 0; i < media.length; i += chunkSize) {
+    const chunk = media.slice(i, i + chunkSize);
+    await db
+      .insert(seasonalBrowseItems)
+      .values(
+        chunk.map((m, idx) => {
+          const sortOrder = i + idx;
+          return {
+            season,
+            year,
+            page: Math.floor(sortOrder / BROWSE_PAGE_SIZE) + 1,
+            sortOrder,
+            anilistId: m.id,
+            titleRomaji: m.title.romaji,
+            titleEnglish: m.title.english,
+            titleNative: m.title.native,
+            coverImageLarge: m.coverImage.large,
+            coverImageMedium: m.coverImage.medium,
+            bannerImage: m.bannerImage,
+            format: m.format,
+            status: m.status,
+            episodes: m.episodes,
+            averageScore: m.averageScore,
+            genresJson: JSON.stringify(m.genres),
+            description: m.description,
+            seasonValue: m.season,
+            seasonYear: m.seasonYear,
+            startYear: m.startDate.year,
+            startMonth: m.startDate.month,
+            startDay: m.startDate.day,
+            nextAiringAt: m.nextAiringEpisode?.airingAt ?? null,
+            nextAiringEpisode: m.nextAiringEpisode?.episode ?? null,
+            nextAiringTimeUntil: m.nextAiringEpisode?.timeUntilAiring ?? null,
+            studiosJson: JSON.stringify(m.studios.nodes),
+            syncRunAt,
+            updatedAt: now,
+          };
+        })
+      )
+      .onConflictDoUpdate({
+        target: [
+          seasonalBrowseItems.season,
+          seasonalBrowseItems.year,
+          seasonalBrowseItems.anilistId,
+        ],
+        set: {
+          page: sql`excluded.page`,
+          sortOrder: sql`excluded.sort_order`,
+          titleRomaji: sql`excluded.title_romaji`,
+          titleEnglish: sql`excluded.title_english`,
+          titleNative: sql`excluded.title_native`,
+          coverImageLarge: sql`excluded.cover_image_large`,
+          coverImageMedium: sql`excluded.cover_image_medium`,
+          bannerImage: sql`excluded.banner_image`,
+          format: sql`excluded.format`,
+          status: sql`excluded.status`,
+          episodes: sql`excluded.episodes`,
+          averageScore: sql`excluded.average_score`,
+          genresJson: sql`excluded.genres_json`,
+          description: sql`excluded.description`,
+          seasonValue: sql`excluded.season_value`,
+          seasonYear: sql`excluded.season_year`,
+          startYear: sql`excluded.start_year`,
+          startMonth: sql`excluded.start_month`,
+          startDay: sql`excluded.start_day`,
+          nextAiringAt: sql`excluded.next_airing_at`,
+          nextAiringEpisode: sql`excluded.next_airing_episode`,
+          nextAiringTimeUntil: sql`excluded.next_airing_time_until`,
+          studiosJson: sql`excluded.studios_json`,
+          syncRunAt,
+          updatedAt: now,
+        },
+      });
+  }
+}
+
+async function cleanupBrowseRows(
+  db: ReturnType<typeof drizzle>,
+  season: string,
+  year: number,
+  syncRunAt: number
+): Promise<void> {
+  await db.run(
+    sql`
+      DELETE FROM seasonal_browse_items
+      WHERE season = ${season}
+        AND year = ${year}
+        AND sync_run_at <> ${syncRunAt}
+    `
+  );
+}
+
 async function getSyncState(
   db: ReturnType<typeof drizzle>,
   season: string,
@@ -152,6 +276,7 @@ async function syncAnilistPage(
   const page = state.nextPage;
   const syncRunAt = state.done === 0 && page > 1 ? state.lastSyncedAt ?? Date.now() : Date.now();
   const data = await gqlRequestPage(season, year, page, ANILIST_PER_PAGE);
+  await upsertBrowseItems(db, season, year, syncRunAt, data.media);
   const anilistIds = data.media.map((m: { id: number }) => m.id);
   const tvdbMap = await batchGetTvdbIds(anilistIds);
   await upsertTvdbIds(
@@ -166,6 +291,7 @@ async function syncAnilistPage(
   const isDone = !data.pageInfo.hasNextPage || data.media.length === 0;
   if (isDone) {
     await cleanupSourceRows(db, season, year, "anilist", syncRunAt);
+    await cleanupBrowseRows(db, season, year, syncRunAt);
   }
   await db
     .update(seasonFeedSync)

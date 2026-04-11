@@ -69,4 +69,40 @@ export const seasonFeedSync = sqliteTable(
   (t) => [primaryKey({ columns: [t.season, t.year, t.source] })]
 );
 
+// Persisted AniList seasonal browse cards for fast homepage/load-more reads
+export const seasonalBrowseItems = sqliteTable(
+  "seasonal_browse_items",
+  {
+    season: text("season").notNull(),
+    year: integer("year").notNull(),
+    page: integer("page").notNull(),
+    sortOrder: integer("sort_order").notNull(),
+    anilistId: integer("anilist_id").notNull(),
+    titleRomaji: text("title_romaji").notNull(),
+    titleEnglish: text("title_english"),
+    titleNative: text("title_native"),
+    coverImageLarge: text("cover_image_large").notNull(),
+    coverImageMedium: text("cover_image_medium").notNull(),
+    bannerImage: text("banner_image"),
+    format: text("format").notNull(),
+    status: text("status").notNull(),
+    episodes: integer("episodes"),
+    averageScore: integer("average_score"),
+    genresJson: text("genres_json").notNull(),
+    description: text("description"),
+    seasonValue: text("season_value").notNull(),
+    seasonYear: integer("season_year").notNull(),
+    startYear: integer("start_year"),
+    startMonth: integer("start_month"),
+    startDay: integer("start_day"),
+    nextAiringAt: integer("next_airing_at"),
+    nextAiringEpisode: integer("next_airing_episode"),
+    nextAiringTimeUntil: integer("next_airing_time_until"),
+    studiosJson: text("studios_json").notNull(),
+    syncRunAt: integer("sync_run_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.season, t.year, t.anilistId] })]
+);
+
 
