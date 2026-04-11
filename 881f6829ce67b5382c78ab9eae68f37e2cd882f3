@@ -1,0 +1,23 @@
+src/server/routes/anime.ts
+  899dfabebe7b6ae3 3,36-50,52-53
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "881f6829ce67b5382c78ab9eae68f37e2cd882f3",
+  "prompts": {
+    "899dfabebe7b6ae3": {
+      "agent_id": {
+        "tool": "droid",
+        "id": "58743deb-80a6-4ad5-a6de-c652085b30a4",
+        "model": "custom:gpt-5.4"
+      },
+      "human_author": "shivam bansal",
+      "messages": [],
+      "total_additions": 19,
+      "total_deletions": 12,
+      "accepted_lines": 19,
+      "overriden_lines": 0
+    }
+  }
+}
