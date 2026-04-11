@@ -39,6 +39,7 @@ async function upsertTvdbIds(
   season: string,
   year: number,
   source: string,
+  syncRunAt: number,
   tvdbIds: number[]
 ): Promise<void> {
   if (tvdbIds.length === 0) return;
@@ -49,12 +50,44 @@ async function upsertTvdbIds(
     const chunk = tvdbIds.slice(i, i + chunkSize);
     await db
       .insert(seasonFeedEntries)
-      .values(chunk.map((id) => ({ season, year, tvdbId: id, source, updatedAt: now })))
+      .values(
+        chunk.map((id) => ({
+          season,
+          year,
+          tvdbId: id,
+          source,
+          syncRunAt,
+          updatedAt: now,
+        }))
+      )
       .onConflictDoUpdate({
-        target: [seasonFeedEntries.season, seasonFeedEntries.year, seasonFeedEntries.tvdbId],
-        set: { source, updatedAt: now },
+        target: [
+          seasonFeedEntries.season,
+          seasonFeedEntries.year,
+          seasonFeedEntries.source,
+          seasonFeedEntries.tvdbId,
+        ],
+        set: { syncRunAt, updatedAt: now },
       });
   }
+}
+
+async function cleanupSourceRows(
+  db: ReturnType<typeof drizzle>,
+  season: string,
+  year: number,
+  source: string,
+  syncRunAt: number
+): Promise<void> {
+  await db.run(
+    sql`
+      DELETE FROM season_feed_entries
+      WHERE season = ${season}
+        AND year = ${year}
+        AND source = ${source}
+        AND sync_run_at <> ${syncRunAt}
+    `
+  );
 }
 
 async function getSyncState(
@@ -117,18 +150,29 @@ async function syncAnilistPage(
   }
 
   const page = state.nextPage;
+  const syncRunAt = state.done === 0 && page > 1 ? state.lastSyncedAt ?? Date.now() : Date.now();
   const data = await gqlRequestPage(season, year, page, ANILIST_PER_PAGE);
   const anilistIds = data.media.map((m: { id: number }) => m.id);
   const tvdbMap = await batchGetTvdbIds(anilistIds);
-  await upsertTvdbIds(db, season, year, "anilist", Array.from(tvdbMap.values()));
+  await upsertTvdbIds(
+    db,
+    season,
+    year,
+    "anilist",
+    syncRunAt,
+    Array.from(tvdbMap.values())
+  );
 
   const isDone = !data.pageInfo.hasNextPage || data.media.length === 0;
+  if (isDone) {
+    await cleanupSourceRows(db, season, year, "anilist", syncRunAt);
+  }
   await db
     .update(seasonFeedSync)
     .set({
       nextPage: isDone ? 1 : page + 1,
       done: isDone ? 1 : 0,
-      lastSyncedAt: Date.now(),
+      lastSyncedAt: syncRunAt,
     })
     .where(
       and(
@@ -165,14 +209,16 @@ async function syncMAL(
   }
 
   // MAL fetches everything in one call (limit 500), so always mark done after one sync
+  const syncRunAt = Date.now();
   const malMedia = await getAllMALSeasonalAnime(season, year, malClientId);
   const malIds = malMedia.map((m) => m.id);
   const tvdbMap = await batchGetTvdbIdsFromMal(malIds);
-  await upsertTvdbIds(db, season, year, "mal", Array.from(tvdbMap.values()));
+  await upsertTvdbIds(db, season, year, "mal", syncRunAt, Array.from(tvdbMap.values()));
+  await cleanupSourceRows(db, season, year, "mal", syncRunAt);
 
   await db
     .update(seasonFeedSync)
-    .set({ done: 1, nextPage: 1, lastSyncedAt: Date.now() })
+    .set({ done: 1, nextPage: 1, lastSyncedAt: syncRunAt })
     .where(
       and(
         eq(seasonFeedSync.season, season),

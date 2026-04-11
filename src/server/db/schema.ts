@@ -49,9 +49,10 @@ export const seasonFeedEntries = sqliteTable(
     year: integer("year").notNull(),
     tvdbId: integer("tvdb_id").notNull(),
     source: text("source").notNull(), // "anilist" | "mal"
+    syncRunAt: integer("sync_run_at").notNull(),
     updatedAt: integer("updated_at").notNull(),
   },
-  (t) => [primaryKey({ columns: [t.season, t.year, t.tvdbId] })]
+  (t) => [primaryKey({ columns: [t.season, t.year, t.source, t.tvdbId] })]
 );
 
 // Tracks incremental sync state per (season, year, source)
