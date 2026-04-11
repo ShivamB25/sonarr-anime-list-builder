@@ -1,0 +1,29 @@
+src/server/routes/anime.ts
+  899dfabebe7b6ae3 4,36-44,47-49
+src/server/lib/sync.ts
+  899dfabebe7b6ae3 42,53-62,64-70,75-90,153,157-164,167-169,175,212,216-217,221
+drizzle/0002_zippy_captain_stacy.sql
+  899dfabebe7b6ae3 12
+src/server/db/schema.ts
+  899dfabebe7b6ae3 52,55
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "3d6b848c5dbaffc6bfc574a113f2eaa79c333b61",
+  "prompts": {
+    "899dfabebe7b6ae3": {
+      "agent_id": {
+        "tool": "droid",
+        "id": "58743deb-80a6-4ad5-a6de-c652085b30a4",
+        "model": "custom:gpt-5.4"
+      },
+      "human_author": "shivam bansal",
+      "messages": [],
+      "total_additions": 69,
+      "total_deletions": 28,
+      "accepted_lines": 69,
+      "overriden_lines": 0
+    }
+  }
+}
