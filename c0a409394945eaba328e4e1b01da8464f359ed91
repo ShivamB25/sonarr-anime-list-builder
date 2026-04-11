@@ -1,0 +1,23 @@
+.serena/memories/deployment/wrangler_workflow.md
+  899dfabebe7b6ae3 1-27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "c0a409394945eaba328e4e1b01da8464f359ed91",
+  "prompts": {
+    "899dfabebe7b6ae3": {
+      "agent_id": {
+        "tool": "droid",
+        "id": "58743deb-80a6-4ad5-a6de-c652085b30a4",
+        "model": "custom:gpt-5.4"
+      },
+      "human_author": "shivam bansal",
+      "messages": [],
+      "total_additions": 27,
+      "total_deletions": 0,
+      "accepted_lines": 27,
+      "overriden_lines": 0
+    }
+  }
+}
