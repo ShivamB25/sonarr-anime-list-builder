@@ -4,3 +4,7 @@ dist/
 .dev.vars
 *.tsbuildinfo
 .env
+
+.DS_Store
+**/.DS_Store
+proxies.txt
