@@ -106,49 +106,6 @@ async function gqlRequest(query: string, variables: Record<string, unknown>) {
 
 import { cached } from "./cache";
 
-export async function getSeasonalAnime(
-  season: string,
-  year: number,
-  page = 1,
-  perPage = 25
-) {
-  const key = `anilist:seasonal:${season}:${year}:${page}:${perPage}`;
-  return cached(key, 3600, () =>
-    gqlRequest(SEASONAL_QUERY, {
-      season: season.toUpperCase(),
-      seasonYear: year,
-      page,
-      perPage,
-    })
-  );
-}
-
-export async function getAllSeasonalAnime(
-  season: string,
-  year: number
-): Promise<AniListMedia[]> {
-  const key = `anilist:seasonal-all:${season}:${year}`;
-  return cached(key, 3600, async () => {
-    const perPage = 50;
-    const maxPages = 5; // safety cap ~250 anime max
-    let page = 1;
-    const allMedia: AniListMedia[] = [];
-
-    while (page <= maxPages) {
-      const data = await gqlRequest(SEASONAL_QUERY, {
-        season: season.toUpperCase(),
-        seasonYear: year,
-        page,
-        perPage,
-      });
-      allMedia.push(...data.media);
-      if (!data.pageInfo.hasNextPage || data.media.length === 0) break;
-      page++;
-    }
-
-    return allMedia;
-  });
-}
 
 export async function searchAnime(search: string, page = 1, perPage = 10) {
   const key = `anilist:search:${encodeURIComponent(search)}:${page}:${perPage}`;

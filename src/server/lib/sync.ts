@@ -45,31 +45,15 @@ async function upsertTvdbIds(
 ): Promise<void> {
   if (tvdbIds.length === 0) return;
   const now = Date.now();
-  // D1 supports up to 100 params per statement; batch in chunks of 50
-  const chunkSize = 50;
-  for (let i = 0; i < tvdbIds.length; i += chunkSize) {
-    const chunk = tvdbIds.slice(i, i + chunkSize);
-    await db
-      .insert(seasonFeedEntries)
-      .values(
-        chunk.map((id) => ({
-          season,
-          year,
-          tvdbId: id,
-          source,
-          syncRunAt,
-          updatedAt: now,
-        }))
-      )
-      .onConflictDoUpdate({
-        target: [
-          seasonFeedEntries.season,
-          seasonFeedEntries.year,
-          seasonFeedEntries.source,
-          seasonFeedEntries.tvdbId,
-        ],
-        set: { syncRunAt, updatedAt: now },
-      });
+  // Insert one row at a time to stay safely within D1's SQL variable limit
+  for (const tvdbId of tvdbIds) {
+    await db.run(sql`
+      INSERT INTO season_feed_entries (season, year, tvdb_id, source, sync_run_at, updated_at)
+      VALUES (${season}, ${year}, ${tvdbId}, ${source}, ${syncRunAt}, ${now})
+      ON CONFLICT (season, year, source, tvdb_id) DO UPDATE SET
+        sync_run_at = excluded.sync_run_at,
+        updated_at = excluded.updated_at
+    `);
   }
 }
 
@@ -91,6 +75,81 @@ async function cleanupSourceRows(
   );
 }
 
+async function upsertBrowseItem(
+  db: ReturnType<typeof drizzle>,
+  season: string,
+  year: number,
+  syncRunAt: number,
+  m: {
+    id: number;
+    title: { romaji: string; english: string | null; native: string | null };
+    coverImage: { large: string; medium: string };
+    bannerImage: string | null;
+    format: string;
+    status: string;
+    episodes: number | null;
+    averageScore: number | null;
+    genres: string[];
+    season: string;
+    seasonYear: number;
+    description: string | null;
+    nextAiringEpisode: { airingAt: number; episode: number; timeUntilAiring: number } | null;
+    startDate: { year: number; month: number; day: number };
+    studios: { nodes: { name: string }[] };
+  },
+  sortOrder: number
+): Promise<void> {
+  const now = Date.now();
+  const page = Math.floor(sortOrder / BROWSE_PAGE_SIZE) + 1;
+  await db.run(sql`
+    INSERT INTO seasonal_browse_items (
+      season, year, page, sort_order, anilist_id,
+      title_romaji, title_english, title_native,
+      cover_image_large, cover_image_medium, banner_image,
+      format, status, episodes, average_score, genres_json,
+      description, season_value, season_year,
+      start_year, start_month, start_day,
+      next_airing_at, next_airing_episode, next_airing_time_until,
+      studios_json, sync_run_at, updated_at
+    ) VALUES (
+      ${season}, ${year}, ${page}, ${sortOrder}, ${m.id},
+      ${m.title.romaji ?? ""}, ${m.title.english ?? null}, ${m.title.native ?? null},
+      ${m.coverImage.large ?? ""}, ${m.coverImage.medium ?? ""}, ${m.bannerImage ?? null},
+      ${m.format ?? "UNKNOWN"}, ${m.status ?? "UNKNOWN"}, ${m.episodes ?? null}, ${m.averageScore ?? null}, ${JSON.stringify(m.genres)},
+      ${m.description ?? null}, ${m.season ?? season}, ${m.seasonYear ?? year},
+      ${m.startDate.year}, ${m.startDate.month}, ${m.startDate.day},
+      ${m.nextAiringEpisode?.airingAt ?? null}, ${m.nextAiringEpisode?.episode ?? null}, ${m.nextAiringEpisode?.timeUntilAiring ?? null},
+      ${JSON.stringify(m.studios.nodes)}, ${syncRunAt}, ${now}
+    )
+    ON CONFLICT (season, year, anilist_id) DO UPDATE SET
+      page = excluded.page,
+      sort_order = excluded.sort_order,
+      title_romaji = excluded.title_romaji,
+      title_english = excluded.title_english,
+      title_native = excluded.title_native,
+      cover_image_large = excluded.cover_image_large,
+      cover_image_medium = excluded.cover_image_medium,
+      banner_image = excluded.banner_image,
+      format = excluded.format,
+      status = excluded.status,
+      episodes = excluded.episodes,
+      average_score = excluded.average_score,
+      genres_json = excluded.genres_json,
+      description = excluded.description,
+      season_value = excluded.season_value,
+      season_year = excluded.season_year,
+      start_year = excluded.start_year,
+      start_month = excluded.start_month,
+      start_day = excluded.start_day,
+      next_airing_at = excluded.next_airing_at,
+      next_airing_episode = excluded.next_airing_episode,
+      next_airing_time_until = excluded.next_airing_time_until,
+      studios_json = excluded.studios_json,
+      sync_run_at = excluded.sync_run_at,
+      updated_at = excluded.updated_at
+  `);
+}
+
 async function upsertBrowseItems(
   db: ReturnType<typeof drizzle>,
   season: string,
@@ -109,92 +168,13 @@ async function upsertBrowseItems(
     season: string;
     seasonYear: number;
     description: string | null;
-    nextAiringEpisode: {
-      airingAt: number;
-      episode: number;
-      timeUntilAiring: number;
-    } | null;
+    nextAiringEpisode: { airingAt: number; episode: number; timeUntilAiring: number } | null;
     startDate: { year: number; month: number; day: number };
     studios: { nodes: { name: string }[] };
   }[]
 ): Promise<void> {
-  if (media.length === 0) return;
-  const now = Date.now();
-  const chunkSize = 25;
-
-  for (let i = 0; i < media.length; i += chunkSize) {
-    const chunk = media.slice(i, i + chunkSize);
-    await db
-      .insert(seasonalBrowseItems)
-      .values(
-        chunk.map((m, idx) => {
-          const sortOrder = i + idx;
-          return {
-            season,
-            year,
-            page: Math.floor(sortOrder / BROWSE_PAGE_SIZE) + 1,
-            sortOrder,
-            anilistId: m.id,
-            titleRomaji: m.title.romaji,
-            titleEnglish: m.title.english,
-            titleNative: m.title.native,
-            coverImageLarge: m.coverImage.large,
-            coverImageMedium: m.coverImage.medium,
-            bannerImage: m.bannerImage,
-            format: m.format,
-            status: m.status,
-            episodes: m.episodes,
-            averageScore: m.averageScore,
-            genresJson: JSON.stringify(m.genres),
-            description: m.description,
-            seasonValue: m.season,
-            seasonYear: m.seasonYear,
-            startYear: m.startDate.year,
-            startMonth: m.startDate.month,
-            startDay: m.startDate.day,
-            nextAiringAt: m.nextAiringEpisode?.airingAt ?? null,
-            nextAiringEpisode: m.nextAiringEpisode?.episode ?? null,
-            nextAiringTimeUntil: m.nextAiringEpisode?.timeUntilAiring ?? null,
-            studiosJson: JSON.stringify(m.studios.nodes),
-            syncRunAt,
-            updatedAt: now,
-          };
-        })
-      )
-      .onConflictDoUpdate({
-        target: [
-          seasonalBrowseItems.season,
-          seasonalBrowseItems.year,
-          seasonalBrowseItems.anilistId,
-        ],
-        set: {
-          page: sql`excluded.page`,
-          sortOrder: sql`excluded.sort_order`,
-          titleRomaji: sql`excluded.title_romaji`,
-          titleEnglish: sql`excluded.title_english`,
-          titleNative: sql`excluded.title_native`,
-          coverImageLarge: sql`excluded.cover_image_large`,
-          coverImageMedium: sql`excluded.cover_image_medium`,
-          bannerImage: sql`excluded.banner_image`,
-          format: sql`excluded.format`,
-          status: sql`excluded.status`,
-          episodes: sql`excluded.episodes`,
-          averageScore: sql`excluded.average_score`,
-          genresJson: sql`excluded.genres_json`,
-          description: sql`excluded.description`,
-          seasonValue: sql`excluded.season_value`,
-          seasonYear: sql`excluded.season_year`,
-          startYear: sql`excluded.start_year`,
-          startMonth: sql`excluded.start_month`,
-          startDay: sql`excluded.start_day`,
-          nextAiringAt: sql`excluded.next_airing_at`,
-          nextAiringEpisode: sql`excluded.next_airing_episode`,
-          nextAiringTimeUntil: sql`excluded.next_airing_time_until`,
-          studiosJson: sql`excluded.studios_json`,
-          syncRunAt,
-          updatedAt: now,
-        },
-      });
+  for (let i = 0; i < media.length; i++) {
+    await upsertBrowseItem(db, season, year, syncRunAt, media[i], i);
   }
 }
 
@@ -274,7 +254,7 @@ async function syncAnilistPage(
   }
 
   const page = state.nextPage;
-  const syncRunAt = state.done === 0 && page > 1 ? state.lastSyncedAt ?? Date.now() : Date.now();
+  const syncRunAt = state.lastSyncedAt ?? Date.now();
   const data = await gqlRequestPage(season, year, page, ANILIST_PER_PAGE);
   await upsertBrowseItems(db, season, year, syncRunAt, data.media);
   const anilistIds = data.media.map((m: { id: number }) => m.id);
@@ -354,28 +334,67 @@ async function syncMAL(
     );
 }
 
+export type SyncError = {
+  season: string;
+  year: number;
+  source: "anilist" | "mal";
+  message: string;
+};
+
+export type SyncResult = {
+  completed: boolean;
+  errors: SyncError[];
+};
+
 export async function runSync(
   d1: D1Database,
-  malClientId: string
-): Promise<void> {
+  malClientId: string,
+  failFast = false
+): Promise<SyncResult> {
   const db = drizzle(d1);
   const targets = getSeasonTargets();
+  const errors: SyncError[] = [];
 
   for (const { season, year } of targets) {
-    // AniList: one page per cron tick per season
     try {
       await syncAnilistPage(db, season, year);
-    } catch {
-      // skip this season's anilist page, try next season
+    } catch (error) {
+      const syncError = {
+        season,
+        year,
+        source: "anilist" as const,
+        message: error instanceof Error ? error.message : String(error),
+      };
+      if (failFast) {
+        throw new Error(
+          `[${syncError.source}] ${syncError.season} ${syncError.year}: ${syncError.message}`
+        );
+      }
+      errors.push(syncError);
     }
 
-    // MAL: full fetch per season (single request, 500 limit)
     if (malClientId) {
       try {
         await syncMAL(db, season, year, malClientId);
-      } catch {
-        // skip this season's mal sync
+      } catch (error) {
+        const syncError = {
+          season,
+          year,
+          source: "mal" as const,
+          message: error instanceof Error ? error.message : String(error),
+        };
+        if (failFast) {
+          throw new Error(
+            `[${syncError.source}] ${syncError.season} ${syncError.year}: ${syncError.message}`
+          );
+        }
+        errors.push(syncError);
       }
     }
   }
+
+  return {
+    completed: errors.length === 0,
+    errors,
+  };
 }
