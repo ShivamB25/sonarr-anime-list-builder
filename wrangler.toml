@@ -14,3 +14,5 @@ migrations_dir = "drizzle"
 
 [triggers]
 crons = ["0 * * * *", "30 * * * *"]
+
+
