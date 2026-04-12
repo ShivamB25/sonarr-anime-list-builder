@@ -1,0 +1,23 @@
+wrangler.toml
+  20b3e23aead4489a 18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "6398ff9626d41f1be94051bf18d74752e8419695",
+  "prompts": {
+    "20b3e23aead4489a": {
+      "agent_id": {
+        "tool": "droid",
+        "id": "f7168dc1-2be8-44e4-ab73-7dd4d46adab4",
+        "model": "custom:gpt-5.4"
+      },
+      "human_author": "shivam bansal",
+      "messages": [],
+      "total_additions": 5,
+      "total_deletions": 1,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}
