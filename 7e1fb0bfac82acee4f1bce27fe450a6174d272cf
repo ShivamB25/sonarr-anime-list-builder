@@ -1,0 +1,23 @@
+src/server/lib/sync.ts
+  ac158ba03346b618 48-56,78-152,171,176-177,337-348,351-353,356,361-373,379-391,395-399
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "7e1fb0bfac82acee4f1bce27fe450a6174d272cf",
+  "prompts": {
+    "ac158ba03346b618": {
+      "agent_id": {
+        "tool": "droid",
+        "id": "715f86e4-e183-41d5-a9de-ce7723ef7dd2",
+        "model": "custom:claude-sonnet-4-6"
+      },
+      "human_author": "shivam bansal",
+      "messages": [],
+      "total_additions": 139,
+      "total_deletions": 163,
+      "accepted_lines": 134,
+      "overriden_lines": 0
+    }
+  }
+}
