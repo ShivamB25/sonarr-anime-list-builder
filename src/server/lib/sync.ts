@@ -1,14 +1,36 @@
 import { drizzle } from "drizzle-orm/d1";
 import { eq, and, sql } from "drizzle-orm";
 import { seasonFeedEntries, seasonFeedSync, seasonalBrowseItems } from "../db/schema";
-import { gqlRequestPage } from "./anilist";
-import { getAllMALSeasonalAnime } from "./mal";
+import { gqlRequestPage, type AniListMedia } from "./anilist";
+import { getAllMALSeasonalAnime, type MALAnime } from "./mal";
 import { batchGetTvdbIds, batchGetTvdbIdsFromMal } from "./anime-mapping";
 
 const ANILIST_PER_PAGE = 50;
 const BROWSE_PAGE_SIZE = 25;
 // Reset done=0 after 24h so each season re-syncs daily
 const RESYNC_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const TV_LIKE_ANILIST_FORMATS = new Set(["TV", "TV_SHORT", "ONA"]);
+const TV_LIKE_MAL_MEDIA_TYPES = new Set(["tv", "ona"]);
+// Allow shows that started within this many years before the target year (covers multi-cour carryovers)
+const START_YEAR_LOOKBACK = 2;
+
+function isSeasonFeedAniListEntry(
+  media: AniListMedia,
+  season: string,
+  year: number
+): boolean {
+  if (!TV_LIKE_ANILIST_FORMATS.has(media.format)) return false;
+  if (media.status !== "RELEASING" && media.status !== "NOT_YET_RELEASED") return false;
+  const startYear = media.startDate.year;
+  return !!startYear && startYear >= year - START_YEAR_LOOKBACK;
+}
+
+function isSeasonFeedMALEntry(media: MALAnime, season: string, year: number): boolean {
+  if (!media.start_date || !TV_LIKE_MAL_MEDIA_TYPES.has(media.media_type ?? "")) return false;
+  if (media.status !== "currently_airing" && media.status !== "not_yet_aired") return false;
+  const startYear = parseInt(media.start_date.split("-")[0], 10);
+  return startYear >= year - START_YEAR_LOOKBACK;
+}
 
 function getSeasonTargets(): { season: string; year: number }[] {
   const now = new Date();
@@ -257,7 +279,9 @@ async function syncAnilistPage(
   const syncRunAt = state.lastSyncedAt ?? Date.now();
   const data = await gqlRequestPage(season, year, page, ANILIST_PER_PAGE);
   await upsertBrowseItems(db, season, year, syncRunAt, data.media);
-  const anilistIds = data.media.map((m: { id: number }) => m.id);
+  const anilistIds = data.media
+    .filter((m: AniListMedia) => isSeasonFeedAniListEntry(m, season, year))
+    .map((m: AniListMedia) => m.id);
   const tvdbMap = await batchGetTvdbIds(anilistIds);
   await upsertTvdbIds(
     db,
@@ -317,7 +341,9 @@ async function syncMAL(
   // MAL fetches everything in one call (limit 500), so always mark done after one sync
   const syncRunAt = Date.now();
   const malMedia = await getAllMALSeasonalAnime(season, year, malClientId);
-  const malIds = malMedia.map((m) => m.id);
+  const malIds = malMedia
+    .filter((m) => isSeasonFeedMALEntry(m, season, year))
+    .map((m) => m.id);
   const tvdbMap = await batchGetTvdbIdsFromMal(malIds);
   await upsertTvdbIds(db, season, year, "mal", syncRunAt, Array.from(tvdbMap.values()));
   await cleanupSourceRows(db, season, year, "mal", syncRunAt);

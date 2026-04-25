@@ -3,6 +3,9 @@ const MAL_URL = "https://api.myanimelist.net/v2";
 export type MALAnime = {
   id: number;
   title: string;
+  start_date?: string;
+  media_type?: string;
+  status?: string;
 };
 
 export async function getAllMALSeasonalAnime(
@@ -16,7 +19,8 @@ export async function getAllMALSeasonalAnime(
   let offset = 0;
 
   while (true) {
-    const url = `${MAL_URL}/anime/season/${year}/${normalizedSeason}?limit=${perPage}&offset=${offset}&fields=id,title`;
+    const fields = "id,title,start_date,media_type,status";
+    const url = `${MAL_URL}/anime/season/${year}/${normalizedSeason}?limit=${perPage}&offset=${offset}&fields=${fields}`;
     const res = await fetch(url, {
       headers: { "X-MAL-CLIENT-ID": clientId },
     });
