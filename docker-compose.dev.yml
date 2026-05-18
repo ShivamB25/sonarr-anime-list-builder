@@ -1,12 +1,14 @@
 services:
   app:
-    image: shivamb25/anime-airing-list:latest
-    pull_policy: always
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: anime-airing-list:dev
+    pull_policy: never
     ports:
       - "8787:8787"
 
-    # Option 1: set values directly in compose.
-    # Uncomment these when you do not want to manage a separate .env file.
+    # Option 1: set values directly in compose for local testing.
     # environment:
     #   SESSION_SECRET: replace-with-a-long-random-secret
     #   ADMIN_SYNC_TOKEN: replace-with-a-long-random-admin-token
@@ -14,13 +16,12 @@ services:
     #   SQLITE_PATH: /app/data/airing-list.sqlite
 
     # Option 2: load values from .env.
-    # Copy .env.example to .env and edit it for your deployment.
+    # Copy .env.example to .env and edit it.
     env_file:
       - path: .env
         required: false
     volumes:
-      - airing-list-data:/app/data
-    restart: unless-stopped
+      - airing-list-dev-data:/app/data
 
 volumes:
-  airing-list-data:
+  airing-list-dev-data:

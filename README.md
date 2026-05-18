@@ -6,7 +6,7 @@ A seasonal anime list builder for Sonarr. Browse airing shows by season, create 
 
 - **Hono** for the Cloudflare Workers API
 - **React 19 + Vite** for the client
-- **Drizzle ORM + Cloudflare D1** for storage
+- **Drizzle ORM + Cloudflare D1 or self-hosted SQLite** for storage
 - **Tailwind CSS v4** for styling
 - **AniList GraphQL API** for search metadata and background seasonal sync
 - **MyAnimeList API** as an additional seasonal sync source
@@ -23,7 +23,7 @@ A seasonal anime list builder for Sonarr. Browse airing shows by season, create 
 7. Paste that URL into **Sonarr -> Import Lists -> Custom List -> List URL**.
 8. Sonarr imports the entries using TVDB IDs.
 
-No Sonarr API key is required. Seasonal browsing and season feeds are D1-backed; only `/api/anime/search` fetches AniList live at request time.
+No Sonarr API key is required. Seasonal browsing and season feeds are backed by the configured SQLite-compatible store; only `/api/anime/search` fetches AniList live at request time.
 
 Guest users get a session cookie automatically. Username/password accounts are optional if you want lists to persist across devices.
 
@@ -62,11 +62,87 @@ bun run dev
 
 The dev server starts at `http://localhost:8787`.
 
+## Self-host with Docker
+
+The published image is available at:
+
+```text
+shivamb25/anime-airing-list:latest
+```
+
+Docker Hub: <https://hub.docker.com/repository/docker/shivamb25/anime-airing-list>
+
+The self-hosted image runs a compiled Bun/Hono server, serves the built React client, and stores data in SQLite at `/app/data/airing-list.sqlite`. Drizzle migrations from `drizzle/` are applied automatically on startup.
+
+1. Configure environment variables using either direct Compose values or a `.env` file.
+
+Option A: edit `docker-compose.yml` and uncomment the `environment:` block:
+
+```yaml
+environment:
+  SESSION_SECRET: replace-with-a-long-random-secret
+  ADMIN_SYNC_TOKEN: replace-with-a-long-random-admin-token
+  MAL_CLIENT_ID: optional-myanimelist-client-id
+  SQLITE_PATH: /app/data/airing-list.sqlite
+```
+
+Option B: copy the example environment file:
+
+```bash
+cp .env.example .env
+```
+
+Then edit `.env`:
+
+```bash
+SESSION_SECRET=replace-with-a-long-random-secret
+ADMIN_SYNC_TOKEN=replace-with-a-long-random-admin-token
+MAL_CLIENT_ID=optional-myanimelist-client-id
+SQLITE_PATH=/app/data/airing-list.sqlite
+```
+
+2. Start the published image:
+
+```bash
+docker compose up -d
+```
+
+The app will be available at `http://localhost:8787`.
+
+### Docker Compose files
+
+| File | Purpose |
+| --- | --- |
+| `docker-compose.yml` | Production/self-host compose file that pulls `shivamb25/anime-airing-list:latest` from Docker Hub |
+| `docker-compose.dev.yml` | Local compose file that builds the image from this repository |
+
+Use the dev compose file when testing Docker changes locally:
+
+```bash
+docker compose -f docker-compose.dev.yml up --build
+```
+
+### Docker data and updates
+
+Application data is stored in the named Docker volume `airing-list-data`. To update to the latest published image:
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+To inspect logs:
+
+```bash
+docker compose logs -f app
+```
+
 ## Commands
 
 | Command | Description |
 | --- | --- |
 | `bun run dev` | Start the local Wrangler dev server |
+| `bun run dev:local` | Start the self-hosted Bun server against local SQLite |
 | `bun run dev:client` | Watch and rebuild the React client |
 | `bun run build` | Build the client and run a dry-run deploy |
 | `bun run deploy` | Build the client and deploy to Cloudflare |
