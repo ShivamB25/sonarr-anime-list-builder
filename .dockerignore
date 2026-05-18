@@ -1,0 +1,12 @@
+.git
+.serena
+node_modules
+dist
+.wrangler
+data
+.env*
+!.env.example
+*.tsbuildinfo
+.DS_Store
+**/.DS_Store
+proxies.txt

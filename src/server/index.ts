@@ -61,3 +61,5 @@ export default {
     ctx.waitUntil(runSync(env.DB, env.MAL_CLIENT_ID));
   },
 } satisfies ExportedHandler<Env["Bindings"]>;
+
+export { app };

@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "bunx wrangler dev",
+    "dev:local": "bun --env-file=.env src/server/local.ts",
     "dev:client": "bunx vite build --watch",
     "build": "bunx vite build && bunx wrangler deploy --dry-run",
     "deploy": "bunx vite build && bunx wrangler deploy",
@@ -15,24 +16,24 @@
   },
   "dependencies": {
     "@chenglou/pretext": "^0.0.5",
-    "bcryptjs": "^3.0.2",
+    "bcryptjs": "^3.0.3",
     "drizzle-orm": "^0.41.0",
-    "hono": "^4.7.6"
+    "hono": "^4.12.19"
   },
   "devDependencies": {
-    "typescript": "^5.8.3",
-    "@types/node": "^22.14.1",
+    "typescript": "^5.9.3",
+    "@types/node": "^22.19.19",
     "@types/bcryptjs": "^2.4.6",
-    "@cloudflare/workers-types": "^4.20250410.0",
-    "wrangler": "^4.14.1",
-    "drizzle-kit": "^0.31.0",
-    "vite": "^6.3.1",
-    "@vitejs/plugin-react": "^4.4.1",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
-    "@types/react": "^19.1.2",
-    "@types/react-dom": "^19.1.2",
-    "tailwindcss": "^4.1.4",
-    "@tailwindcss/vite": "^4.1.4"
+    "@cloudflare/workers-types": "^4.20260518.1",
+    "wrangler": "^4.92.0",
+    "drizzle-kit": "^0.31.10",
+    "vite": "^6.4.2",
+    "@vitejs/plugin-react": "^4.7.0",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "tailwindcss": "^4.3.0",
+    "@tailwindcss/vite": "^4.3.0"
   }
 }

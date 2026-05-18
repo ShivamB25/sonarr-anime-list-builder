@@ -1,0 +1,13 @@
+services:
+  app:
+    build: .
+    image: anime-airing-list:local
+    ports:
+      - "8787:8787"
+    env_file:
+      - .env.example
+    volumes:
+      - airing-list-data:/app/data
+
+volumes:
+  airing-list-data:
