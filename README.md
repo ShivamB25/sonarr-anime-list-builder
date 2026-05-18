@@ -1,58 +1,27 @@
 # Airing List
 
-A seasonal anime list builder for Sonarr. Browse airing shows by season, create lists, and use the generated Sonarr feed URL to import them.
+Seasonal anime list builder for Sonarr. Browse airing shows, build lists, and feed them straight into Sonarr via TVDB IDs.
 
 ## Stack
 
-- **Hono** for the Cloudflare Workers API
-- **React 19 + Vite** for the client
-- **Drizzle ORM + Cloudflare D1 or self-hosted SQLite** for storage
-- **Tailwind CSS v4** for styling
-- **AniList GraphQL API** for search metadata and background seasonal sync
-- **MyAnimeList API** as an additional seasonal sync source
-- **Fribb anime-lists** for AniList/MAL to TVDB ID mapping
+- **Hono** — API layer (Cloudflare Workers or self-hosted Bun)
+- **React 19 + Vite** — client
+- **Drizzle ORM** — storage (Cloudflare D1 or plain SQLite)
+- **Tailwind CSS v4** — styling
+- **AniList + MyAnimeList** — metadata and background sync
+- **Fribb anime-lists** — AniList/MAL → TVDB ID mapping
 
 ## How it works
 
-1. Browse anime by season or search by title.
-2. Seasonal browsing at `/api/anime/seasonal` reads from the D1-backed `seasonal_browse_items` table.
-3. The seasonal Sonarr feed at `/api/anime/season-feed` reads from the D1-backed `season_feed_entries` table.
-4. Background cron jobs refresh those tables using AniList, MyAnimeList, and Fribb mappings.
-5. Create lists and add anime to them.
-6. Each list exposes a public URL at `/api/lists/{id}/sonarr`.
-7. Paste that URL into **Sonarr -> Import Lists -> Custom List -> List URL**.
-8. Sonarr imports the entries using TVDB IDs.
+1. Browse by season or search by title.
+2. Seasonal data (`/api/anime/seasonal`, `/api/anime/season-feed`) is populated by background cron jobs that pull from AniList, MAL, and Fribb.
+3. Create lists and add shows to them.
+4. Each list exposes a Sonarr-compatible feed at `/api/lists/{id}/sonarr`.
+5. Paste that URL into **Sonarr → Import Lists → Custom List → List URL**. No API key needed.
 
-No Sonarr API key is required. Seasonal browsing and season feeds are backed by the configured SQLite-compatible store; only `/api/anime/search` fetches AniList live at request time.
+Guest sessions are automatic (cookie-based). Create an account if you want lists to survive across devices.
 
-Guest users get a session cookie automatically. Username/password accounts are optional if you want lists to persist across devices.
-
-## Project structure
-
-```text
-src/
-  server/
-    index.ts              # Hono app entry point
-    db/schema.ts          # Drizzle schema (users, lists, seasonal feed and browse tables)
-    lib/
-      anilist.ts          # AniList GraphQL client for search and background sync
-      anime-mapping.ts    # AniList/MAL to TVDB mapping via Fribb
-      sync.ts             # Background seasonal sync into D1
-      auth.ts             # Cookie-based session auth
-    routes/
-      auth.ts             # Register, login, logout, session
-      anime.ts            # D1-backed seasonal browse/feed and live AniList search
-      lists.ts            # CRUD lists/items and public /sonarr feed
-  client/
-    main.tsx              # React entry
-    App.tsx               # Router (hash-based)
-    api.ts                # Typed fetch wrapper
-    hooks.ts              # useUser, useSeasons
-    components/           # Header, AnimeCard, AuthModal, AddToListModal
-    pages/                # SeasonBrowser, MyLists, ListDetail
-```
-
-## Setup
+## Quick start
 
 ```bash
 bun install
@@ -60,78 +29,104 @@ bun run db:migrate:local
 bun run dev
 ```
 
-The dev server starts at `http://localhost:8787`.
+Open `http://localhost:8787`.
 
-## Self-host with Docker
+## Docker
 
-The published image is available at:
+Pre-built image: **`shivamb25/anime-airing-list`** ([Docker Hub](https://hub.docker.com/repository/docker/shivamb25/anime-airing-list))
 
-```text
-shivamb25/anime-airing-list:latest
-```
+The image bundles a compiled Bun/Hono binary, the built React client, and Drizzle migrations. Data lives in SQLite at `/app/data/airing-list.sqlite`; migrations run automatically on startup.
 
-Docker Hub: <https://hub.docker.com/repository/docker/shivamb25/anime-airing-list>
+### Configuration
 
-The self-hosted image runs a compiled Bun/Hono server, serves the built React client, and stores data in SQLite at `/app/data/airing-list.sqlite`. Drizzle migrations from `drizzle/` are applied automatically on startup.
+| Variable | Required | Description |
+| --- | --- | --- |
+| `SESSION_SECRET` | yes | Random string for signing session cookies |
+| `ADMIN_SYNC_TOKEN` | no | Bearer token for the `/api/admin/run-sync` endpoint |
+| `MAL_CLIENT_ID` | no | MyAnimeList API client ID (enables MAL as a sync source) |
+| `SQLITE_PATH` | no | SQLite database path (default `/app/data/airing-list.sqlite`) |
+| `PORT` | no | Server port (default `8787`) |
 
-1. Configure environment variables using either direct Compose values or a `.env` file.
+### Production (pull from Docker Hub)
 
-Option A: edit `docker-compose.yml` and uncomment the `environment:` block:
+`docker-compose.yml`:
 
 ```yaml
-environment:
-  SESSION_SECRET: replace-with-a-long-random-secret
-  ADMIN_SYNC_TOKEN: replace-with-a-long-random-admin-token
-  MAL_CLIENT_ID: optional-myanimelist-client-id
-  SQLITE_PATH: /app/data/airing-list.sqlite
+services:
+  app:
+    image: shivamb25/anime-airing-list:latest
+    pull_policy: always
+    ports:
+      - "8787:8787"
+    environment:
+      SESSION_SECRET: "a-long-random-secret-here"
+      ADMIN_SYNC_TOKEN: "another-long-random-secret"
+      # MAL_CLIENT_ID: "your-mal-client-id"
+      # SQLITE_PATH: /app/data/airing-list.sqlite
+    volumes:
+      - airing-list-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  airing-list-data:
 ```
 
-Option B: copy the example environment file:
+Or use a `.env` file instead of `environment`:
 
 ```bash
-cp .env.example .env
+cp .env.example .env   # then edit values
 ```
 
-Then edit `.env`:
+And swap the `environment:` block for:
 
-```bash
-SESSION_SECRET=replace-with-a-long-random-secret
-ADMIN_SYNC_TOKEN=replace-with-a-long-random-admin-token
-MAL_CLIENT_ID=optional-myanimelist-client-id
-SQLITE_PATH=/app/data/airing-list.sqlite
+```yaml
+    env_file:
+      - path: .env
+        required: false
 ```
 
-2. Start the published image:
+Then:
 
 ```bash
 docker compose up -d
 ```
 
-The app will be available at `http://localhost:8787`.
+### Development (build locally)
 
-### Docker Compose files
+`docker-compose.dev.yml`:
 
-| File | Purpose |
-| --- | --- |
-| `docker-compose.yml` | Production/self-host compose file that pulls `shivamb25/anime-airing-list:latest` from Docker Hub |
-| `docker-compose.dev.yml` | Local compose file that builds the image from this repository |
+```yaml
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: anime-airing-list:dev
+    pull_policy: never
+    ports:
+      - "8787:8787"
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - airing-list-dev-data:/app/data
 
-Use the dev compose file when testing Docker changes locally:
+volumes:
+  airing-list-dev-data:
+```
 
 ```bash
 docker compose -f docker-compose.dev.yml up --build
 ```
 
-### Docker data and updates
-
-Application data is stored in the named Docker volume `airing-list-data`. To update to the latest published image:
+### Updating
 
 ```bash
 docker compose pull
 docker compose up -d
 ```
 
-To inspect logs:
+### Logs
 
 ```bash
 docker compose logs -f app
@@ -141,12 +136,12 @@ docker compose logs -f app
 
 | Command | Description |
 | --- | --- |
-| `bun run dev` | Start the local Wrangler dev server |
-| `bun run dev:local` | Start the self-hosted Bun server against local SQLite |
-| `bun run dev:client` | Watch and rebuild the React client |
-| `bun run build` | Build the client and run a dry-run deploy |
-| `bun run deploy` | Build the client and deploy to Cloudflare |
-| `bun run db:generate` | Generate a Drizzle migration from schema changes |
+| `bun run dev` | Wrangler dev server (Cloudflare D1) |
+| `bun run dev:local` | Bun server with local SQLite |
+| `bun run dev:client` | Watch + rebuild the React client |
+| `bun run build` | Build client + dry-run deploy |
+| `bun run deploy` | Build + deploy to Cloudflare |
+| `bun run db:generate` | Generate a Drizzle migration |
 | `bun run db:migrate:local` | Apply migrations to local D1 |
 | `bun run db:migrate:remote` | Apply migrations to production D1 |
 | `bun run db:studio` | Open Drizzle Studio |
@@ -154,28 +149,45 @@ docker compose logs -f app
 ## Deploy to Cloudflare
 
 ```bash
-# Create the D1 database
 bunx wrangler d1 create airing-list-db
+# put the returned database_id in wrangler.toml
 
-# Update database_id in wrangler.toml with the returned ID
-
-# Apply migrations to production
 bun run db:migrate:remote
-
-# Deploy
 bun run deploy
 ```
 
-Set the required Worker secret:
+Set secrets:
 
 ```bash
 bunx wrangler secret put SESSION_SECRET
+bunx wrangler secret put ADMIN_SYNC_TOKEN   # optional
 ```
 
-If you use the admin sync endpoint, also set:
+## Project structure
 
-```bash
-bunx wrangler secret put ADMIN_SYNC_TOKEN
+```
+src/
+  server/
+    index.ts              Hono app + Worker entrypoint
+    local.ts              Self-hosted Bun entrypoint
+    db/schema.ts          Drizzle schema
+    lib/
+      anilist.ts          AniList GraphQL client
+      anime-mapping.ts    AniList/MAL → TVDB via Fribb
+      sync.ts             Background seasonal sync
+      auth.ts             Cookie-based sessions
+      local-d1.ts         D1-compatible SQLite adapter for self-hosting
+    routes/
+      auth.ts             Register, login, logout, session
+      anime.ts            Seasonal browse/feed + live search
+      lists.ts            CRUD lists/items + /sonarr feed
+  client/
+    main.tsx              React entry
+    App.tsx               Hash router
+    api.ts                Typed fetch wrapper
+    hooks.ts              useUser, useSeasons
+    components/           Header, AnimeCard, AuthModal, AddToListModal
+    pages/                SeasonBrowser, MyLists, ListDetail
 ```
 
 ## Sonarr feed format
@@ -189,5 +201,4 @@ bunx wrangler secret put ADMIN_SYNC_TOKEN
 ]
 ```
 
-This is the format Sonarr expects for a Custom Import List.
-
+This is what Sonarr expects for a Custom Import List.
