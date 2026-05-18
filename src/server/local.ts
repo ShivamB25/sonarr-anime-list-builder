@@ -1,4 +1,5 @@
 import { serve } from "bun";
+import { join, normalize } from "node:path";
 import { app } from "./index";
 import {
   createLocalD1Database,
@@ -8,6 +9,7 @@ import {
 
 const port = Number(process.env.PORT ?? "8787");
 const dbPath = process.env.SQLITE_PATH ?? "./data/airing-list.sqlite";
+const assetsDir = process.env.ASSETS_DIR ?? "./dist/client";
 
 await ensureSqliteDirectory(dbPath);
 const DB = createLocalD1Database(dbPath);
@@ -23,7 +25,22 @@ const env = {
 serve({
   port,
   async fetch(request) {
-    return app.fetch(request, env);
+    const url = new URL(request.url);
+    const response = await app.fetch(request, env);
+
+    if (url.pathname.startsWith("/api") || response.status !== 404) {
+      return response;
+    }
+
+    const pathname = url.pathname === "/" ? "/index.html" : url.pathname;
+    const filePath = normalize(join(assetsDir, pathname));
+    const asset = Bun.file(filePath);
+
+    if (await asset.exists()) {
+      return new Response(asset);
+    }
+
+    return new Response(Bun.file(join(assetsDir, "index.html")));
   },
 });
 

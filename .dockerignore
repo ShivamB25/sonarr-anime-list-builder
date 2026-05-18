@@ -1,9 +1,11 @@
 .git
+.github
 .serena
 node_modules
 dist
 .wrangler
 data
+.tmp-*
 .env*
 !.env.example
 *.tsbuildinfo
