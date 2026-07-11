@@ -1,4 +1,10 @@
-Airing List Web is a full-stack TypeScript application for browsing seasonal anime, managing custom anime lists, and exposing Sonarr-compatible list/feed endpoints.
+Sonarr Anime List Builder is a full-stack TypeScript application for browsing seasonal anime, managing custom anime lists, and exposing Sonarr-compatible list/feed endpoints.
+
+Repository identity:
+- GitHub: `https://github.com/ShivamB25/sonarr-anime-list-builder`
+- Package name: `sonarr-anime-list-builder`
+- Search terms/topics emphasize Sonarr, anime, import lists, AniList, MyAnimeList, TVDB, Cloudflare Workers/D1, Bun, Hono, React, TypeScript, and SQLite.
+- The deployed Cloudflare Worker intentionally retains the existing name `airing-list-web`; repository branding and deployment resource names do not need to match.
 
 Current stack:
 - Bun 1.3.14 is the only package manager, command runner, local runtime, and test runner.

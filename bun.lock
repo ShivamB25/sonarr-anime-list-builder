@@ -3,7 +3,7 @@
   "configVersion": 0,
   "workspaces": {
     "": {
-      "name": "airing-list-web",
+      "name": "sonarr-anime-list-builder",
       "dependencies": {
         "@chenglou/pretext": "^0.0.5",
         "bcryptjs": "^3.0.3",

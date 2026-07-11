@@ -1,7 +1,18 @@
 {
-  "name": "airing-list-web",
+  "name": "sonarr-anime-list-builder",
   "version": "0.1.0",
   "private": true,
+  "description": "Build seasonal anime import lists and TVDB feeds for Sonarr using AniList and MyAnimeList metadata.",
+  "keywords": [
+    "sonarr",
+    "anime",
+    "anilist",
+    "myanimelist",
+    "tvdb",
+    "import-list",
+    "cloudflare-workers",
+    "bun"
+  ],
   "engines": {
     "bun": "1.3.14"
   },

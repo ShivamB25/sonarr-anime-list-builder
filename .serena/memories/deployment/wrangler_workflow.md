@@ -1,4 +1,4 @@
-Project: airing-list-web
+Project: sonarr-anime-list-builder
 
 Wrangler deploy/reference workflow (Bun-only):
 - Build + production deploy: `bun run deploy`
@@ -23,7 +23,9 @@ Production deployment sequence:
 6. Re-list remote migrations and smoke-test `/api/health` plus a D1-backed route such as `/api/anime/seasonal?...`.
 
 Project-specific Wrangler config:
-- Worker name: `airing-list-web`
+- Canonical GitHub repository: `https://github.com/ShivamB25/sonarr-anime-list-builder`
+- Repository/package name: `sonarr-anime-list-builder`
+- Worker name: `airing-list-web` (intentionally unchanged to preserve deployment URLs and resources)
 - Main entry: `src/server/index.ts`
 - Static assets: `dist/client`
 - D1 binding: `DB`
@@ -38,7 +40,7 @@ Current deployed/source state (2026-07-12):
 - Production migration `0004_add_query_indexes.sql` applied; no remote migrations pending afterward.
 - Live `/api/health` returned `{ "status": "ok" }`.
 - Live Summer 2026 seasonal D1 read returned page 1 with 73 total items.
-- `main`/`origin/main` commit: `c8eca559f67192cbfaa8d65d5b725e3fd87a8696` (`perf: add Drizzle query indexes and checks`).
+- `main`/`origin/main` is the canonical source; the repository was renamed to `sonarr-anime-list-builder` after deployment without changing the Worker resource name.
 
 Operational notes:
 - `bun run build` and `bun run deploy` gate on `db:check`, all TypeScript 7 projects, the Bun test suite, and the Vite client build before Wrangler.

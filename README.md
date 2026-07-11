@@ -1,6 +1,8 @@
-# Airing List
+# Sonarr Anime List Builder
 
-Seasonal anime list builder for Sonarr. Browse airing shows, build lists, and feed them straight into Sonarr via TVDB IDs.
+Open-source seasonal anime import-list builder for Sonarr. Browse AniList and
+MyAnimeList metadata, create custom lists, and expose Sonarr-compatible TVDB
+feeds. Run it on Cloudflare Workers with D1 or self-host it with Bun and SQLite.
 
 ## Stack
 

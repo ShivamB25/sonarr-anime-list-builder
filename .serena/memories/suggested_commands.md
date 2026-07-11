@@ -30,6 +30,8 @@ Deployment:
 - Live Worker: `https://airing-list-web.edge-5af.workers.dev`.
 
 Repository notes:
+- Canonical GitHub repository: `https://github.com/ShivamB25/sonarr-anime-list-builder`.
+- Package/Serena project name: `sonarr-anime-list-builder`.
 - Wrangler entry: `src/server/index.ts`.
 - Static assets: `dist/client`.
 - D1 database: `airing-list-db`, binding `DB`.
