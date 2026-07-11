@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useUser } from "./hooks";
-import { api } from "./api";
+import { api, getErrorMessage } from "./api";
 import Header from "./components/Header";
 import SeasonBrowser from "./pages/SeasonBrowser";
 import MyLists from "./pages/MyLists";
@@ -45,14 +45,20 @@ export default function App() {
           window.location.hash = p;
         }}
         onAuthClick={() => setShowAuth(true)}
-        onLogout={async () => {
-          await api.auth.logout();
-          setUser(null);
-          refresh();
+        onLogout={() => {
+          void (async () => {
+            try {
+              await api.auth.logout();
+              setUser(null);
+              await refresh();
+            } catch (logoutError) {
+              window.alert(getErrorMessage(logoutError, "Unable to log out."));
+            }
+          })();
         }}
       />
       <main className="max-w-7xl mx-auto px-4 py-6">
-        {page.name === "browse" && <SeasonBrowser user={user} />}
+        {page.name === "browse" && <SeasonBrowser />}
         {page.name === "lists" && (
           <MyLists onOpenList={(id) => (window.location.hash = `list/${id}`)} />
         )}

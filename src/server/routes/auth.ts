@@ -1,19 +1,43 @@
 import { Hono } from "hono";
+import type { Context } from "hono";
 import { drizzle } from "drizzle-orm/d1";
 import { eq } from "drizzle-orm";
 import { compare, hash } from "bcryptjs";
 import { users } from "../db/schema";
+import type { AppEnv } from "../env";
 import {
   getOrCreateGuest,
-  getSessionUser,
   registerUser,
   loginUser,
   logout,
 } from "../lib/auth";
 
-type Env = { Bindings: { DB: D1Database; SESSION_SECRET: string } };
 
-const auth = new Hono<Env>();
+const auth = new Hono<AppEnv>();
+
+interface AuthBody {
+  username: string;
+  password: string;
+}
+
+async function readJson(c: Context<AppEnv>): Promise<unknown> {
+  try {
+    return await c.req.json();
+  } catch {
+    return null;
+  }
+}
+
+function isAuthBody(value: unknown): value is AuthBody {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "username" in value &&
+    typeof value.username === "string" &&
+    "password" in value &&
+    typeof value.password === "string"
+  );
+}
 
 auth.get("/session", async (c) => {
   const user = await getOrCreateGuest(c);
@@ -25,10 +49,14 @@ auth.get("/session", async (c) => {
 });
 
 auth.post("/register", async (c) => {
-  const { username, password } = await c.req.json<{
-    username: string;
-    password: string;
-  }>();
+  const body = await readJson(c);
+
+  if (!isAuthBody(body)) {
+    return c.json({ error: "Username and password (min 4 chars) required" }, 400);
+  }
+
+  const username = body.username.trim();
+  const { password } = body;
 
   if (!username || !password || password.length < 4) {
     return c.json({ error: "Username and password (min 4 chars) required" }, 400);
@@ -55,10 +83,16 @@ auth.post("/register", async (c) => {
 });
 
 auth.post("/login", async (c) => {
-  const { username, password } = await c.req.json<{
-    username: string;
-    password: string;
-  }>();
+  const body = await readJson(c);
+  if (!isAuthBody(body)) {
+    return c.json({ error: "Username and password required" }, 400);
+  }
+
+  const username = body.username.trim();
+  const { password } = body;
+  if (!username || !password) {
+    return c.json({ error: "Username and password required" }, 400);
+  }
 
   const db = drizzle(c.env.DB);
   const [user] = await db

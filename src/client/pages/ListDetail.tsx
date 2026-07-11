@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
-import { api, type ListDetail as ListDetailType } from "../api";
+import { useEffect, useRef, useState } from "react";
+import { api, getErrorMessage, isAbortError } from "../api";
+import type { ListDetail as ListDetailType } from "../../shared/types";
 import CopyUrlBar from "../components/CopyUrlBar";
 
 type Props = { listId: string; onBack: () => void };
@@ -7,19 +8,51 @@ type Props = { listId: string; onBack: () => void };
 export default function ListDetail({ listId, onBack }: Props) {
   const [list, setList] = useState<ListDetailType | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const requestVersion = useRef(0);
 
   useEffect(() => {
-    api.lists.get(listId).then((l) => {
-      setList(l);
-      setLoading(false);
-    });
+    const controller = new AbortController();
+    const version = requestVersion.current + 1;
+    requestVersion.current = version;
+    setLoading(true);
+    setError("");
+    setList(null);
+
+    async function loadList() {
+      try {
+        const loadedList = await api.lists.get(listId, controller.signal);
+        if (requestVersion.current === version) setList(loadedList);
+      } catch (loadError) {
+        if (!isAbortError(loadError) && requestVersion.current === version) {
+          setError(getErrorMessage(loadError, "Unable to load the list."));
+        }
+      } finally {
+        if (!controller.signal.aborted && requestVersion.current === version) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadList();
+    return () => controller.abort();
   }, [listId]);
 
   async function removeItem(itemId: string) {
-    await api.lists.removeItem(listId, itemId);
-    setList((prev) =>
-      prev ? { ...prev, items: prev.items.filter((i) => i.id !== itemId) } : null
-    );
+    const version = requestVersion.current;
+    setError("");
+    try {
+      await api.lists.removeItem(listId, itemId);
+      if (requestVersion.current === version) {
+        setList((prev) =>
+          prev ? { ...prev, items: prev.items.filter((item) => item.id !== itemId) } : null
+        );
+      }
+    } catch (removeError) {
+      if (requestVersion.current === version) {
+        setError(getErrorMessage(removeError, "Unable to remove the title."));
+      }
+    }
   }
 
   const sonarrUrl = `${window.location.origin}/api/lists/${listId}/sonarr`;
@@ -34,8 +67,11 @@ export default function ListDetail({ listId, onBack }: Props) {
 
   if (!list) {
     return (
-      <p className="text-center text-[var(--text-secondary)] py-20">
-        List not found.
+      <p
+        className={`text-center py-20 ${error ? "text-red-300" : "text-[var(--text-secondary)]"}`}
+        role={error ? "alert" : undefined}
+      >
+        {error || "List not found."}
       </p>
     );
   }
@@ -50,6 +86,12 @@ export default function ListDetail({ listId, onBack }: Props) {
       </button>
 
       <h1 className="text-2xl font-bold mb-4">{list.name}</h1>
+
+      {error && (
+        <p className="mb-4 rounded-lg bg-red-500/10 px-4 py-3 text-sm text-red-300" role="alert">
+          {error}
+        </p>
+      )}
 
       <div className="mb-6 p-4 bg-[var(--bg-secondary)] rounded-xl border border-white/10 space-y-2">
         <div className="flex items-center justify-between">
@@ -102,7 +144,7 @@ export default function ListDetail({ listId, onBack }: Props) {
                     {item.score && <span>{item.score}%</span>}
                   </div>
                   <button
-                    onClick={() => removeItem(item.id)}
+                    onClick={() => void removeItem(item.id)}
                     className="mt-2 text-xs px-3 py-1 bg-red-600/30 hover:bg-red-600/50 text-red-300 rounded transition"
                   >
                     Remove

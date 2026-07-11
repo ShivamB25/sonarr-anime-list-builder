@@ -1,13 +1,80 @@
 import { Hono } from "hono";
+import type { Context } from "hono";
 import { drizzle } from "drizzle-orm/d1";
-import { eq, and } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { lists, listItems } from "../db/schema";
 import { getOrCreateGuest } from "../lib/auth";
 import { batchGetTvdbIds } from "../lib/anime-mapping";
+import type { AppEnv } from "../env";
+import { isSeason } from "../../shared/season";
 
-type Env = { Bindings: { DB: D1Database; SESSION_SECRET: string } };
 
-const listsRouter = new Hono<Env>();
+const listsRouter = new Hono<AppEnv>();
+
+interface CreateListBody {
+  name: string;
+  season?: unknown;
+  year?: unknown;
+}
+
+interface CreateListItemBody {
+  anilistId: number;
+  title: string;
+  titleEnglish?: string | null;
+  coverImage?: string | null;
+  format?: string | null;
+  status?: string | null;
+  episodes?: number | null;
+  score?: number | null;
+}
+
+async function readJson(c: Context<AppEnv>): Promise<unknown> {
+  try {
+    return await c.req.json();
+  } catch {
+    return null;
+  }
+}
+
+function isCreateListBody(value: unknown): value is CreateListBody {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "name" in value &&
+    typeof value.name === "string"
+  );
+}
+
+function isCreateListItemBody(value: unknown): value is CreateListItemBody {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "anilistId" in value &&
+    Number.isInteger(value.anilistId) &&
+    Number(value.anilistId) > 0 &&
+    "title" in value &&
+    typeof value.title === "string" &&
+    value.title.length > 0 &&
+    (!("titleEnglish" in value) ||
+      value.titleEnglish === null ||
+      typeof value.titleEnglish === "string") &&
+    (!("coverImage" in value) ||
+      value.coverImage === null ||
+      typeof value.coverImage === "string") &&
+    (!("format" in value) ||
+      value.format === null ||
+      typeof value.format === "string") &&
+    (!("status" in value) ||
+      value.status === null ||
+      typeof value.status === "string") &&
+    (!("episodes" in value) ||
+      value.episodes === null ||
+      typeof value.episodes === "number") &&
+    (!("score" in value) ||
+      value.score === null ||
+      typeof value.score === "number")
+  );
+}
 
 listsRouter.get("/", async (c) => {
   const user = await getOrCreateGuest(c);
@@ -23,16 +90,30 @@ listsRouter.get("/", async (c) => {
 });
 
 listsRouter.post("/", async (c) => {
+  const body = await readJson(c);
+
+  if (!isCreateListBody(body)) {
+    return c.json({ error: "Name required" }, 400);
+  }
+
+  const name = body.name.trim();
+  const { season, year } = body;
+  if (!name) {
+    return c.json({ error: "Name required" }, 400);
+  }
+  if (season !== undefined && season !== null && !isSeason(season)) {
+    return c.json({ error: "Invalid season" }, 400);
+  }
+  if (
+    year !== undefined &&
+    year !== null &&
+    (typeof year !== "number" || !Number.isInteger(year) || year <= 0)
+  ) {
+    return c.json({ error: "Invalid year" }, 400);
+  }
+
   const user = await getOrCreateGuest(c);
   const db = drizzle(c.env.DB);
-  const { name, season, year } = await c.req.json<{
-    name: string;
-    season?: string;
-    year?: number;
-  }>();
-
-  if (!name) return c.json({ error: "Name required" }, 400);
-
   const id = crypto.randomUUID();
   const [list] = await db
     .insert(lists)
@@ -89,16 +170,10 @@ listsRouter.post("/:id/items", async (c) => {
 
   if (!list) return c.json({ error: "List not found" }, 404);
 
-  const body = await c.req.json<{
-    anilistId: number;
-    title: string;
-    titleEnglish?: string;
-    coverImage?: string;
-    format?: string;
-    status?: string;
-    episodes?: number;
-    score?: number;
-  }>();
+  const body = await readJson(c);
+  if (!isCreateListItemBody(body)) {
+    return c.json({ error: "Invalid item" }, 400);
+  }
 
   const id = crypto.randomUUID();
   const [item] = await db
@@ -134,11 +209,12 @@ listsRouter.delete("/:id/items/:itemId", async (c) => {
 
   if (!list) return c.json({ error: "List not found" }, 404);
 
-  await db.delete(listItems).where(eq(listItems.id, itemId));
+  await db
+    .delete(listItems)
+    .where(and(eq(listItems.id, itemId), eq(listItems.listId, listId)));
   return c.json({ ok: true });
 });
 
-import { cached } from "../lib/cache";
 
 // Public Sonarr-compatible feed -- no auth required
 // Returns [{ "TvdbId": 12345 }, ...] for Sonarr Custom Import List

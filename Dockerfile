@@ -1,4 +1,4 @@
-FROM oven/bun:1.2.20 AS deps
+FROM oven/bun:1.3.14 AS deps
 
 WORKDIR /app
 
@@ -10,8 +10,9 @@ FROM deps AS build
 WORKDIR /app
 
 COPY . .
-RUN bunx vite build
-RUN bun build --compile --target=bun-linux-arm64 --outfile server src/server/local.ts
+RUN bun run typecheck
+RUN bun run build:client
+RUN bun build --compile --outfile server src/server/local.ts
 
 FROM debian:bookworm-slim AS runner
 
@@ -24,8 +25,15 @@ ENV ASSETS_DIR=/app/dist/client
 COPY --from=build /app/server ./server
 COPY --from=build /app/dist/client ./dist/client
 COPY --from=build /app/drizzle ./drizzle
-RUN mkdir -p /app/data
+RUN groupadd --system app \
+    && useradd --system --gid app --home-dir /nonexistent --shell /usr/sbin/nologin app \
+    && mkdir -p /app/data \
+    && chmod 0555 /app/server \
+    && chmod -R a=rX /app/dist /app/drizzle \
+    && chown app:app /app/data \
+    && chmod 0700 /app/data
 
 EXPOSE 8787
+USER app
 
 ENTRYPOINT ["./server"]

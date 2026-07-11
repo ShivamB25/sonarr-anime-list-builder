@@ -4,6 +4,7 @@ import { seasonFeedEntries, seasonFeedSync, seasonalBrowseItems } from "../db/sc
 import { gqlRequestPage, type AniListMedia } from "./anilist";
 import { getAllMALSeasonalAnime, type MALAnime } from "./mal";
 import { batchGetTvdbIds, batchGetTvdbIdsFromMal } from "./anime-mapping";
+import { SEASONS, type Season } from "../../shared/season";
 
 const ANILIST_PER_PAGE = 50;
 const BROWSE_PAGE_SIZE = 25;
@@ -16,7 +17,6 @@ const START_YEAR_LOOKBACK = 2;
 
 function isSeasonFeedAniListEntry(
   media: AniListMedia,
-  season: string,
   year: number
 ): boolean {
   if (!TV_LIKE_ANILIST_FORMATS.has(media.format)) return false;
@@ -25,34 +25,26 @@ function isSeasonFeedAniListEntry(
   return !!startYear && startYear >= year - START_YEAR_LOOKBACK;
 }
 
-function isSeasonFeedMALEntry(media: MALAnime, season: string, year: number): boolean {
+function isSeasonFeedMALEntry(media: MALAnime, year: number): boolean {
   if (!media.start_date || !TV_LIKE_MAL_MEDIA_TYPES.has(media.media_type ?? "")) return false;
   if (media.status !== "currently_airing" && media.status !== "not_yet_aired") return false;
   const startYear = parseInt(media.start_date.split("-")[0], 10);
   return startYear >= year - START_YEAR_LOOKBACK;
 }
 
-function getSeasonTargets(): { season: string; year: number }[] {
+function getSeasonTargets(): { season: Season; year: number }[] {
   const now = new Date();
   const year = now.getUTCFullYear();
-  const month = now.getUTCMonth() + 1;
-
-  let currentSeason: string;
-  if (month <= 3) currentSeason = "WINTER";
-  else if (month <= 6) currentSeason = "SPRING";
-  else if (month <= 9) currentSeason = "SUMMER";
-  else currentSeason = "FALL";
-
-  const seasons = ["WINTER", "SPRING", "SUMMER", "FALL"];
-  const targets: { season: string; year: number }[] = [];
+  const currentSeason = SEASONS[Math.floor(now.getUTCMonth() / 3)]!;
+  const targets: { season: Season; year: number }[] = [];
 
   // Current season first, then all of current year, then previous year
   targets.push({ season: currentSeason, year });
-  for (const s of seasons) {
-    if (s !== currentSeason) targets.push({ season: s, year });
+  for (const season of SEASONS) {
+    if (season !== currentSeason) targets.push({ season, year });
   }
-  for (const s of seasons) {
-    targets.push({ season: s, year: year - 1 });
+  for (const season of SEASONS) {
+    targets.push({ season, year: year - 1 });
   }
   return targets;
 }
@@ -280,7 +272,7 @@ async function syncAnilistPage(
   const data = await gqlRequestPage(season, year, page, ANILIST_PER_PAGE);
   await upsertBrowseItems(db, season, year, syncRunAt, data.media);
   const anilistIds = data.media
-    .filter((m: AniListMedia) => isSeasonFeedAniListEntry(m, season, year))
+    .filter((media: AniListMedia) => isSeasonFeedAniListEntry(media, year))
     .map((m: AniListMedia) => m.id);
   const tvdbMap = await batchGetTvdbIds(anilistIds);
   await upsertTvdbIds(
@@ -342,7 +334,7 @@ async function syncMAL(
   const syncRunAt = Date.now();
   const malMedia = await getAllMALSeasonalAnime(season, year, malClientId);
   const malIds = malMedia
-    .filter((m) => isSeasonFeedMALEntry(m, season, year))
+    .filter((media) => isSeasonFeedMALEntry(media, year))
     .map((m) => m.id);
   const tvdbMap = await batchGetTvdbIdsFromMal(malIds);
   await upsertTvdbIds(db, season, year, "mal", syncRunAt, Array.from(tvdbMap.values()));

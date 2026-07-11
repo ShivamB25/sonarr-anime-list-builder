@@ -1,13 +1,13 @@
-import { useState, useEffect } from "react";
-import { api, type AnimeMedia, type User } from "../api";
+import { useEffect, useRef, useState } from "react";
+import { api, getErrorMessage, isAbortError } from "../api";
+import type { AnimeMedia } from "../../shared/types";
+import { isSeason, SEASON_LABELS } from "../../shared/season";
 import { useSeasons } from "../hooks";
 import VirtualAnimeGrid from "../components/VirtualAnimeGrid";
 import AddToListModal from "../components/AddToListModal";
 import CopyUrlBar from "../components/CopyUrlBar";
 
-type Props = { user: User | null };
-
-export default function SeasonBrowser({ user: _user }: Props) {
+export default function SeasonBrowser() {
   const { currentSeason, currentYear, seasons, years } = useSeasons();
   const [season, setSeason] = useState(currentSeason);
   const [year, setYear] = useState(currentYear);
@@ -18,29 +18,54 @@ export default function SeasonBrowser({ user: _user }: Props) {
   const [hasNext, setHasNext] = useState(false);
   const [search, setSearch] = useState("");
   const [addTarget, setAddTarget] = useState<AnimeMedia | null>(null);
+  const [error, setError] = useState("");
+  const requestVersion = useRef(0);
+  const loadingMoreRef = useRef(false);
 
   useEffect(() => {
+    const controller = new AbortController();
+    const version = requestVersion.current + 1;
+    requestVersion.current = version;
     setLoading(true);
+    setLoadingMore(false);
+    loadingMoreRef.current = false;
     setPage(1);
+    setError("");
 
-    if (search.trim()) {
-      api.anime.search(search.trim()).then((data) => {
-        setAnime(data.media);
-        setHasNext(data.pageInfo.hasNextPage);
-        setLoading(false);
-      });
-    } else {
-      api.anime.seasonal(season, year).then((data) => {
-        setAnime(data.media);
-        setHasNext(data.pageInfo.hasNextPage);
-        setLoading(false);
-      });
+    async function load() {
+      try {
+        const query = search.trim();
+        const data = query
+          ? await api.anime.search(query, 1, controller.signal)
+          : await api.anime.seasonal(season, year, 1, controller.signal);
+
+        if (requestVersion.current === version) {
+          setAnime(data.media);
+          setHasNext(data.pageInfo.hasNextPage);
+        }
+      } catch (loadError) {
+        if (!isAbortError(loadError) && requestVersion.current === version) {
+          setAnime([]);
+          setHasNext(false);
+          setError(getErrorMessage(loadError, "Unable to load anime."));
+        }
+      } finally {
+        if (!controller.signal.aborted && requestVersion.current === version) {
+          setLoading(false);
+        }
+      }
     }
+
+    void load();
+    return () => controller.abort();
   }, [season, year, search]);
 
   async function loadMore() {
-    if (loadingMore) return;
+    if (loadingMoreRef.current) return;
+    loadingMoreRef.current = true;
     setLoadingMore(true);
+    const version = requestVersion.current;
+    setError("");
     const nextPage = page + 1;
 
     try {
@@ -48,20 +73,22 @@ export default function SeasonBrowser({ user: _user }: Props) {
         ? await api.anime.search(search.trim(), nextPage)
         : await api.anime.seasonal(season, year, nextPage);
 
-      setAnime((prev) => [...prev, ...data.media]);
-      setHasNext(data.pageInfo.hasNextPage);
-      setPage((prev) => prev + 1);
+      if (requestVersion.current === version) {
+        setAnime((prev) => [...prev, ...data.media]);
+        setHasNext(data.pageInfo.hasNextPage);
+        setPage(nextPage);
+      }
+    } catch (loadError) {
+      if (requestVersion.current === version) {
+        setError(getErrorMessage(loadError, "Unable to load more anime."));
+      }
     } finally {
-      setLoadingMore(false);
+      if (requestVersion.current === version) {
+        loadingMoreRef.current = false;
+        setLoadingMore(false);
+      }
     }
   }
-
-  const seasonLabels: Record<string, string> = {
-    WINTER: "Winter",
-    SPRING: "Spring",
-    SUMMER: "Summer",
-    FALL: "Fall",
-  };
 
   return (
     <div>
@@ -77,12 +104,14 @@ export default function SeasonBrowser({ user: _user }: Props) {
           <div className="flex gap-2">
             <select
               value={season}
-              onChange={(e) => setSeason(e.target.value)}
+              onChange={(e) => {
+                if (isSeason(e.target.value)) setSeason(e.target.value);
+              }}
               className="px-3 py-2 bg-[var(--bg-secondary)] border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent)] cursor-pointer"
             >
               {seasons.map((s) => (
                 <option key={s} value={s}>
-                  {seasonLabels[s]}
+                  {SEASON_LABELS[s]}
                 </option>
               ))}
             </select>
@@ -111,7 +140,7 @@ export default function SeasonBrowser({ user: _user }: Props) {
                 </div>
                 <div>
                   <h1 className="text-2xl font-bold">
-                    {seasonLabels[season]} {year}
+                    {SEASON_LABELS[season]} {year}
                   </h1>
                   <p className="text-sm text-[var(--text-secondary)]">
                     Browse current picks, add anime to your own list, or copy the full season feed for Sonarr.
@@ -137,21 +166,23 @@ export default function SeasonBrowser({ user: _user }: Props) {
         </h1>
       )}
 
+      {error && (
+        <p className="mb-4 rounded-lg bg-red-500/10 px-4 py-3 text-sm text-red-300" role="alert">
+          {error}
+        </p>
+      )}
+
       {loading ? (
         <div className="flex justify-center py-20">
           <div className="animate-spin w-8 h-8 border-2 border-[var(--accent)] border-t-transparent rounded-full" />
         </div>
-      ) : anime.length === 0 ? (
-        <p className="text-center text-[var(--text-secondary)] py-20">
-          No anime found for this season.
-        </p>
-      ) : (
+      ) : anime.length > 0 ? (
         <>
           <VirtualAnimeGrid anime={anime} onAdd={setAddTarget} />
           {hasNext && (
             <div className="flex justify-center mt-8">
               <button
-                onClick={loadMore}
+                onClick={() => void loadMore()}
                 disabled={loadingMore}
                 className="px-6 py-2 bg-[var(--bg-secondary)] hover:bg-white/10 border border-white/10 rounded-lg transition disabled:opacity-60 disabled:cursor-not-allowed"
               >
@@ -160,7 +191,11 @@ export default function SeasonBrowser({ user: _user }: Props) {
             </div>
           )}
         </>
-      )}
+      ) : !error ? (
+        <p className="text-center text-[var(--text-secondary)] py-20">
+          No anime found for this season.
+        </p>
+      ) : null}
 
       {addTarget && (
         <AddToListModal

@@ -1,16 +1,16 @@
-import { Context } from "hono";
+import type { Context } from "hono";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { users } from "../db/schema";
+import type { AppEnv } from "../env";
 
-type Env = { DB: D1Database; SESSION_SECRET: string };
 
 function generateId() {
   return crypto.randomUUID();
 }
 
-export async function getOrCreateGuest(c: Context<{ Bindings: Env }>) {
+export async function getOrCreateGuest(c: Context<AppEnv>) {
   const db = drizzle(c.env.DB);
   let token = getCookie(c, "session_token");
 
@@ -41,7 +41,7 @@ export async function getOrCreateGuest(c: Context<{ Bindings: Env }>) {
   return user;
 }
 
-export async function getSessionUser(c: Context<{ Bindings: Env }>) {
+export async function getSessionUser(c: Context<AppEnv>) {
   const db = drizzle(c.env.DB);
   const token = getCookie(c, "session_token");
   if (!token) return null;
@@ -55,7 +55,7 @@ export async function getSessionUser(c: Context<{ Bindings: Env }>) {
 }
 
 export async function registerUser(
-  c: Context<{ Bindings: Env }>,
+  c: Context<AppEnv>,
   username: string,
   passwordHash: string
 ) {
@@ -90,7 +90,7 @@ export async function registerUser(
 }
 
 export async function loginUser(
-  c: Context<{ Bindings: Env }>,
+  c: Context<AppEnv>,
   user: { id: string; guestToken: string | null }
 ) {
   const token = user.guestToken ?? generateId();

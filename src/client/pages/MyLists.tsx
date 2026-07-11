@@ -1,15 +1,11 @@
-import { useState, useEffect } from "react";
-import { api, type List } from "../api";
+import { useEffect, useState } from "react";
+import { api, getErrorMessage, isAbortError } from "../api";
+import type { List } from "../../shared/types";
+import { isSeason, SEASON_LABELS } from "../../shared/season";
 import CopyUrlBar from "../components/CopyUrlBar";
 
 type Props = { onOpenList: (id: string) => void };
 
-const SEASON_LABELS: Record<string, string> = {
-  WINTER: "Winter",
-  SPRING: "Spring",
-  SUMMER: "Summer",
-  FALL: "Fall",
-};
 
 export default function MyLists({ onOpenList }: Props) {
   const [lists, setLists] = useState<List[]>([]);
@@ -17,30 +13,52 @@ export default function MyLists({ onOpenList }: Props) {
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    api.lists.getAll().then((l) => {
-      setLists(l);
-      setLoading(false);
-    });
+    const controller = new AbortController();
+
+    async function loadLists() {
+      try {
+        setError("");
+        setLists(await api.lists.getAll(controller.signal));
+      } catch (loadError) {
+        if (!isAbortError(loadError)) {
+          setError(getErrorMessage(loadError, "Unable to load your lists."));
+        }
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    }
+
+    void loadLists();
+    return () => controller.abort();
   }, []);
 
   async function createList() {
     if (!newName.trim()) return;
     setCreating(true);
+    setError("");
     try {
       const list = await api.lists.create(newName.trim());
       setLists((prev) => [...prev, list]);
       setNewName("");
+    } catch (createError) {
+      setError(getErrorMessage(createError, "Unable to create the list."));
     } finally {
       setCreating(false);
     }
   }
 
   async function deleteList(id: string) {
-    await api.lists.delete(id);
-    setLists((prev) => prev.filter((l) => l.id !== id));
-    if (expanded === id) setExpanded(null);
+    setError("");
+    try {
+      await api.lists.delete(id);
+      setLists((prev) => prev.filter((list) => list.id !== id));
+      if (expanded === id) setExpanded(null);
+    } catch (deleteError) {
+      setError(getErrorMessage(deleteError, "Unable to delete the list."));
+    }
   }
 
   function sonarrUrl(id: string) {
@@ -61,10 +79,12 @@ export default function MyLists({ onOpenList }: Props) {
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
           className="flex-1 px-4 py-2 bg-[var(--bg-secondary)] border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-          onKeyDown={(e) => e.key === "Enter" && createList()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void createList();
+          }}
         />
         <button
-          onClick={createList}
+          onClick={() => void createList()}
           disabled={!newName.trim() || creating}
           className="px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg font-medium transition disabled:opacity-50"
         >
@@ -72,11 +92,17 @@ export default function MyLists({ onOpenList }: Props) {
         </button>
       </div>
 
+      {error && (
+        <p className="mb-4 rounded-lg bg-red-500/10 px-4 py-3 text-sm text-red-300" role="alert">
+          {error}
+        </p>
+      )}
+
       {loading ? (
         <div className="flex justify-center py-20">
           <div className="animate-spin w-8 h-8 border-2 border-[var(--accent)] border-t-transparent rounded-full" />
         </div>
-      ) : lists.length === 0 ? (
+      ) : !error && lists.length === 0 ? (
         <div className="text-center py-20">
           <p className="text-[var(--text-secondary)] text-lg mb-2">
             No lists yet
@@ -97,7 +123,7 @@ export default function MyLists({ onOpenList }: Props) {
                   <h3 className="font-medium truncate">{l.name}</h3>
                   {l.season && l.year && (
                     <span className="shrink-0 text-xs px-2 py-0.5 bg-[var(--accent)]/20 text-[var(--accent)] rounded">
-                      {SEASON_LABELS[l.season] ?? l.season} {l.year}
+                      {isSeason(l.season) ? SEASON_LABELS[l.season] : l.season} {l.year}
                     </span>
                   )}
                 </div>
@@ -117,7 +143,7 @@ export default function MyLists({ onOpenList }: Props) {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (confirm(`Delete "${l.name}"?`)) deleteList(l.id);
+                      if (confirm(`Delete "${l.name}"?`)) void deleteList(l.id);
                     }}
                     className="p-1.5 rounded hover:bg-white/10 transition"
                     title="Delete list"

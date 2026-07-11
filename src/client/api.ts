@@ -1,77 +1,102 @@
+import type {
+  AnimePage,
+  List,
+  ListDetail,
+  ListItem,
+  User,
+} from "../shared/types";
+
 const BASE = "/api";
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    ...options,
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
+export class ApiError extends Error {
+  readonly status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
   }
-  return res.json() as Promise<T>;
 }
 
-export type User = { id: string; username: string | null; isGuest: boolean };
-export type AnimeMedia = {
-  id: number;
-  title: { romaji: string; english: string | null; native: string | null };
-  coverImage: { large: string; medium: string };
-  bannerImage: string | null;
-  format: string;
-  status: string;
-  episodes: number | null;
-  averageScore: number | null;
-  genres: string[];
-  season: string;
-  seasonYear: number;
-  description: string | null;
-  nextAiringEpisode: { airingAt: number; episode: number; timeUntilAiring: number } | null;
-  startDate: { year: number; month: number; day: number };
-  studios: { nodes: { name: string }[] };
-};
-export type PageInfo = { hasNextPage: boolean; currentPage: number; lastPage: number; total: number };
-export type AnimePage = { pageInfo: PageInfo; media: AnimeMedia[] };
-export type List = { id: string; name: string; season: string | null; year: number | null; createdAt: string };
-export type ListItem = {
-  id: string;
-  listId: string;
-  anilistId: number;
-  title: string;
-  titleEnglish: string | null;
-  coverImage: string | null;
-  format: string | null;
-  status: string | null;
-  episodes: number | null;
-  score: number | null;
-};
-export type ListDetail = List & { items: ListItem[] };
+export function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+export function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
+function errorMessage(body: unknown, status: number): string {
+  if (
+    typeof body === "object" &&
+    body !== null &&
+    "error" in body &&
+    typeof body.error === "string"
+  ) {
+    return body.error;
+  }
+  return `HTTP ${status}`;
+}
+
+async function readErrorBody(response: Response): Promise<unknown> {
+  const text = await response.text();
+  if (!text) return null;
+
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const headers = new Headers(options.headers);
+  if (options.body !== undefined && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  const response = await fetch(`${BASE}${path}`, {
+    ...options,
+    credentials: "include",
+    headers,
+  });
+
+  if (!response.ok) {
+    const body = await readErrorBody(response);
+    throw new ApiError(response.status, errorMessage(body, response.status));
+  }
+
+  if (response.status === 204) return undefined as T;
+  const body: unknown = await response.json();
+  return body as T;
+}
 
 export const api = {
   auth: {
-    session: () => request<User>("/auth/session"),
+    session: (signal?: AbortSignal) =>
+      request<User>("/auth/session", { signal }),
     register: (username: string, password: string) =>
       request<User>("/auth/register", { method: "POST", body: JSON.stringify({ username, password }) }),
     login: (username: string, password: string) =>
       request<User>("/auth/login", { method: "POST", body: JSON.stringify({ username, password }) }),
-    logout: () => request("/auth/logout", { method: "POST" }),
+    logout: () => request<void>("/auth/logout", { method: "POST" }),
   },
   anime: {
-    seasonal: (season: string, year: number, page = 1) =>
-      request<AnimePage>(`/anime/seasonal?season=${season}&year=${year}&page=${page}`),
-    search: (q: string, page = 1) =>
-      request<AnimePage>(`/anime/search?q=${encodeURIComponent(q)}&page=${page}`),
+    seasonal: (season: string, year: number, page = 1, signal?: AbortSignal) =>
+      request<AnimePage>(`/anime/seasonal?season=${season}&year=${year}&page=${page}`, { signal }),
+    search: (q: string, page = 1, signal?: AbortSignal) =>
+      request<AnimePage>(`/anime/search?q=${encodeURIComponent(q)}&page=${page}`, { signal }),
   },
   lists: {
-    getAll: () => request<List[]>("/lists"),
+    getAll: (signal?: AbortSignal) => request<List[]>("/lists", { signal }),
     create: (name: string, season?: string, year?: number) =>
       request<List>("/lists", { method: "POST", body: JSON.stringify({ name, season, year }) }),
-    get: (id: string) => request<ListDetail>(`/lists/${id}`),
-    delete: (id: string) => request(`/lists/${id}`, { method: "DELETE" }),
+    get: (id: string, signal?: AbortSignal) =>
+      request<ListDetail>(`/lists/${id}`, { signal }),
+    delete: (id: string) => request<void>(`/lists/${id}`, { method: "DELETE" }),
     addItem: (listId: string, item: Omit<ListItem, "id" | "listId">) =>
       request<ListItem>(`/lists/${listId}/items`, { method: "POST", body: JSON.stringify(item) }),
     removeItem: (listId: string, itemId: string) =>
-      request(`/lists/${listId}/items/${itemId}`, { method: "DELETE" }),
+      request<void>(`/lists/${listId}/items/${itemId}`, { method: "DELETE" }),
   },
 };

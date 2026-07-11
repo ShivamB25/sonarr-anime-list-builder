@@ -1,6 +1,7 @@
 import { serve } from "bun";
 import { join, normalize } from "node:path";
 import { app } from "./index";
+import type { AppBindings } from "./env";
 import {
   createLocalD1Database,
   ensureSqliteDirectory,
@@ -12,15 +13,14 @@ const dbPath = process.env.SQLITE_PATH ?? "./data/airing-list.sqlite";
 const assetsDir = process.env.ASSETS_DIR ?? "./dist/client";
 
 await ensureSqliteDirectory(dbPath);
-const DB = createLocalD1Database(dbPath);
-await migrateLocalD1Database(DB, "./drizzle");
+const localDb = createLocalD1Database(dbPath);
+await migrateLocalD1Database(localDb, "./drizzle");
 
 const env = {
-  DB,
-  SESSION_SECRET: process.env.SESSION_SECRET ?? "",
+  DB: localDb as unknown as D1Database,
   MAL_CLIENT_ID: process.env.MAL_CLIENT_ID ?? "",
   ADMIN_SYNC_TOKEN: process.env.ADMIN_SYNC_TOKEN ?? "",
-};
+} satisfies AppBindings;
 
 serve({
   port,

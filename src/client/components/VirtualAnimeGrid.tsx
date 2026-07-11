@@ -1,6 +1,6 @@
 import { useMemo } from "react";
-import { prepare, layout, type PreparedText } from "@chenglou/pretext";
-import type { AnimeMedia } from "../api";
+import { prepare, layout } from "@chenglou/pretext";
+import type { AnimeMedia } from "../../shared/types";
 
 type Props = {
   anime: AnimeMedia[];

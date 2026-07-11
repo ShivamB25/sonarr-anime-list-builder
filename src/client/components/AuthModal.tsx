@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { api, type User } from "../api";
+import { api } from "../api";
+import type { User } from "../../shared/types";
 
 type Props = {
   onClose: () => void;

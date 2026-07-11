@@ -2,17 +2,33 @@ import { Hono } from "hono";
 import { searchAnime } from "../lib/anilist";
 import { cachedWithStale } from "../lib/cache";
 import { drizzle } from "drizzle-orm/d1";
-import { eq, and, sql } from "drizzle-orm";
-import { seasonFeedEntries, seasonalBrowseItems } from "../db/schema";
+import { and, eq, sql } from "drizzle-orm";
+import { seasonalBrowseItems } from "../db/schema";
+import type { AppEnv } from "../env";
+import { getCurrentSeason, isSeason } from "../../shared/season";
 
-type Env = { Bindings: { DB: D1Database; MAL_CLIENT_ID: string } };
 
-const anime = new Hono<Env>();
+const anime = new Hono<AppEnv>();
+
+function parsePositiveInteger(value: string | undefined, fallback: number): number | null {
+  const candidate = value ?? String(fallback);
+  if (!/^\d+$/.test(candidate)) return null;
+
+  const parsed = Number(candidate);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
+}
 
 anime.get("/seasonal", async (c) => {
   const season = (c.req.query("season") ?? getCurrentSeason()).toUpperCase();
-  const year = parseInt(c.req.query("year") ?? String(new Date().getFullYear()));
-  const page = parseInt(c.req.query("page") ?? "1");
+  const year = parsePositiveInteger(
+    c.req.query("year"),
+    new Date().getFullYear()
+  );
+  const page = parsePositiveInteger(c.req.query("page"), 1);
+
+  if (!isSeason(season)) return c.json({ error: "Invalid season" }, 400);
+  if (year === null) return c.json({ error: "Invalid year" }, 400);
+  if (page === null) return c.json({ error: "Invalid page" }, 400);
   const pageSize = 25;
 
   const data = await cachedWithStale(
@@ -32,16 +48,17 @@ anime.get("/seasonal", async (c) => {
         )
         .orderBy(seasonalBrowseItems.sortOrder);
 
-      const countResult = await db.run(
-        sql`
-          SELECT COUNT(*) as count
-          FROM seasonal_browse_items
-          WHERE season = ${season}
-            AND year = ${year}
-        `
-      );
+      const [countResult] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(seasonalBrowseItems)
+        .where(
+          and(
+            eq(seasonalBrowseItems.season, season),
+            eq(seasonalBrowseItems.year, year)
+          )
+        );
 
-      const total = Number(countResult.results[0]?.count ?? 0);
+      const total = countResult?.count ?? 0;
       const media = rows.map((r) => ({
         id: r.anilistId,
         title: {
@@ -98,16 +115,22 @@ anime.get("/search", async (c) => {
   const q = c.req.query("q");
   if (!q) return c.json({ error: "Query required" }, 400);
 
-  const page = parseInt(c.req.query("page") ?? "1");
+  const page = parsePositiveInteger(c.req.query("page"), 1);
+  if (page === null) return c.json({ error: "Invalid page" }, 400);
+
   const data = await searchAnime(q, page);
   return c.json(data);
 });
 
 anime.get("/season-feed", async (c) => {
   const season = (c.req.query("season") ?? getCurrentSeason()).toUpperCase();
-  const year = parseInt(
-    c.req.query("year") ?? String(new Date().getFullYear())
+  const year = parsePositiveInteger(
+    c.req.query("year"),
+    new Date().getFullYear()
   );
+
+  if (!isSeason(season)) return c.json({ error: "Invalid season" }, 400);
+  if (year === null) return c.json({ error: "Invalid year" }, 400);
 
   // D1 is source of truth; keep only a tiny cache as a read accelerator.
   const sonarrEntries = await cachedWithStale(
@@ -115,7 +138,7 @@ anime.get("/season-feed", async (c) => {
     60,
     async () => {
       const db = drizzle(c.env.DB);
-      const rows = await db.run(
+      const rows = await db.all<{ tvdb_id: number }>(
         sql`
           SELECT DISTINCT tvdb_id
           FROM season_feed_entries
@@ -125,7 +148,7 @@ anime.get("/season-feed", async (c) => {
         `
       );
 
-      return rows.results.map((r) => ({ TvdbId: Number(r.tvdb_id) }));
+      return rows.map((row) => ({ TvdbId: Number(row.tvdb_id) }));
     }
   );
 
@@ -133,12 +156,5 @@ anime.get("/season-feed", async (c) => {
   return c.json(sonarrEntries);
 });
 
-function getCurrentSeason(): string {
-  const month = new Date().getMonth() + 1;
-  if (month >= 1 && month <= 3) return "WINTER";
-  if (month >= 4 && month <= 6) return "SPRING";
-  if (month >= 7 && month <= 9) return "SUMMER";
-  return "FALL";
-}
 
 export default anime;

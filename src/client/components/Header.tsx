@@ -1,4 +1,4 @@
-import type { User } from "../api";
+import type { User } from "../../shared/types";
 
 type Props = {
   user: User | null;
@@ -34,7 +34,7 @@ export default function Header({ user, onNavigate, onAuthClick, onLogout }: Prop
           </nav>
         </div>
         <div className="flex items-center gap-3 text-sm">
-          {user?.isGuest ? (
+          {!user || user.isGuest ? (
             <button
               onClick={onAuthClick}
               className="px-3 py-1.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded transition"

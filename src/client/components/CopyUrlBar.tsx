@@ -4,17 +4,25 @@ type Props = { url: string; compact?: boolean };
 
 export default function CopyUrlBar({ url, compact }: Props) {
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
 
   async function copy() {
-    await navigator.clipboard.writeText(url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setCopyFailed(false);
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopyFailed(true);
+      setTimeout(() => setCopyFailed(false), 2000);
+    }
   }
 
   return (
-    <div
-      onClick={copy}
-      className={`group flex items-center gap-2 bg-[var(--bg-primary)] border border-white/10 rounded-lg cursor-pointer hover:border-[var(--accent)]/50 transition ${compact ? "px-3 py-1.5" : "px-4 py-3"}`}
+    <button
+      type="button"
+      onClick={() => void copy()}
+      className={`group flex w-full items-center gap-2 bg-[var(--bg-primary)] border border-white/10 rounded-lg cursor-pointer hover:border-[var(--accent)]/50 transition text-left ${compact ? "px-3 py-1.5" : "px-4 py-3"}`}
       title="Click to copy"
     >
       <svg
@@ -35,15 +43,15 @@ export default function CopyUrlBar({ url, compact }: Props) {
         )}
       </svg>
       <code
-        className={`flex-1 min-w-0 truncate select-all ${compact ? "text-[11px]" : "text-xs"} ${copied ? "text-green-400" : "text-[var(--accent)]"}`}
+        className={`flex-1 min-w-0 truncate select-all ${compact ? "text-[11px]" : "text-xs"} ${copyFailed ? "text-red-300" : copied ? "text-green-400" : "text-[var(--accent)]"}`}
       >
-        {copied ? "Copied!" : url}
+        {copyFailed ? "Copy failed" : copied ? "Copied!" : url}
       </code>
       <span
-        className={`shrink-0 font-medium transition ${compact ? "text-[10px]" : "text-xs"} ${copied ? "text-green-400" : "text-[var(--text-secondary)] group-hover:text-white"}`}
+        className={`shrink-0 font-medium transition ${compact ? "text-[10px]" : "text-xs"} ${copyFailed ? "text-red-300" : copied ? "text-green-400" : "text-[var(--text-secondary)] group-hover:text-white"}`}
       >
-        {copied ? "" : "Copy"}
+        {copied || copyFailed ? "" : "Copy"}
       </span>
-    </div>
+    </button>
   );
 }

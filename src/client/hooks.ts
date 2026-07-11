@@ -1,23 +1,45 @@
-import { useState, useEffect, useCallback } from "react";
-import { api, type User } from "./api";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { api } from "./api";
+import type { User } from "../shared/types";
+import { getCurrentSeason, SEASONS } from "../shared/season";
 
 export function useUser() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const sessionController = useRef<AbortController | null>(null);
+  const refreshGeneration = useRef(0);
 
   const refresh = useCallback(async () => {
+    sessionController.current?.abort();
+    const controller = new AbortController();
+    const generation = refreshGeneration.current + 1;
+    sessionController.current = controller;
+    refreshGeneration.current = generation;
+
     try {
-      const u = await api.auth.session();
-      setUser(u);
+      const u = await api.auth.session(controller.signal);
+      if (!controller.signal.aborted && refreshGeneration.current === generation) {
+        setUser(u);
+      }
     } catch {
-      setUser(null);
+      if (!controller.signal.aborted && refreshGeneration.current === generation) {
+        setUser(null);
+      }
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted && refreshGeneration.current === generation) {
+        sessionController.current = null;
+        setLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
-    refresh();
+    void refresh();
+    return () => {
+      sessionController.current?.abort();
+      sessionController.current = null;
+      refreshGeneration.current += 1;
+    };
   }, [refresh]);
 
   return { user, loading, refresh, setUser };
@@ -26,16 +48,8 @@ export function useUser() {
 export function useSeasons() {
   const now = new Date();
   const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1;
-
-  let currentSeason: string;
-  if (currentMonth >= 1 && currentMonth <= 3) currentSeason = "WINTER";
-  else if (currentMonth >= 4 && currentMonth <= 6) currentSeason = "SPRING";
-  else if (currentMonth >= 7 && currentMonth <= 9) currentSeason = "SUMMER";
-  else currentSeason = "FALL";
-
-  const seasons = ["WINTER", "SPRING", "SUMMER", "FALL"];
+  const currentSeason = getCurrentSeason(now);
   const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
 
-  return { currentSeason, currentYear, seasons, years };
+  return { currentSeason, currentYear, seasons: SEASONS, years };
 }

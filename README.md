@@ -5,7 +5,7 @@ Seasonal anime list builder for Sonarr. Browse airing shows, build lists, and fe
 ## Stack
 
 - **Hono** — API layer (Cloudflare Workers or self-hosted Bun)
-- **React 19 + Vite** — client
+- **React 19 + Vite + TypeScript 7** — client
 - **Drizzle ORM** — storage (Cloudflare D1 or plain SQLite)
 - **Tailwind CSS v4** — styling
 - **AniList + MyAnimeList** — metadata and background sync
@@ -21,15 +21,24 @@ Seasonal anime list builder for Sonarr. Browse airing shows, build lists, and fe
 
 Guest sessions are automatic (cookie-based). Create an account if you want lists to survive across devices.
 
-## Quick start
+## Setup
+
+Use Bun 1.3.14. The project uses the stable TypeScript 7 release.
 
 ```bash
-bun install
+bun install --frozen-lockfile
 bun run db:migrate:local
 bun run dev
 ```
 
 Open `http://localhost:8787`.
+
+For the self-hosted Bun runtime with local SQLite, build the client first:
+
+```bash
+bun run build:client
+bun run dev:local
+```
 
 ## Docker
 
@@ -41,11 +50,9 @@ The image bundles a compiled Bun/Hono binary, the built React client, and Drizzl
 
 | Variable | Required | Description |
 | --- | --- | --- |
-| `SESSION_SECRET` | yes | Random string for signing session cookies |
 | `ADMIN_SYNC_TOKEN` | no | Bearer token for the `/api/admin/run-sync` endpoint |
-| `MAL_CLIENT_ID` | no | MyAnimeList API client ID (enables MAL as a sync source) |
+| `MAL_CLIENT_ID` | no | MyAnimeList API client ID; enables MAL as a sync source |
 | `SQLITE_PATH` | no | SQLite database path (default `/app/data/airing-list.sqlite`) |
-| `PORT` | no | Server port (default `8787`) |
 
 ### Production (pull from Docker Hub)
 
@@ -59,8 +66,7 @@ services:
     ports:
       - "8787:8787"
     environment:
-      SESSION_SECRET: "a-long-random-secret-here"
-      ADMIN_SYNC_TOKEN: "another-long-random-secret"
+      ADMIN_SYNC_TOKEN: "a-long-random-admin-token"
       # MAL_CLIENT_ID: "your-mal-client-id"
       # SQLITE_PATH: /app/data/airing-list.sqlite
     volumes:
@@ -132,19 +138,32 @@ docker compose up -d
 docker compose logs -f app
 ```
 
-## Commands
+## Development and validation
 
 | Command | Description |
 | --- | --- |
-| `bun run dev` | Wrangler dev server (Cloudflare D1) |
-| `bun run dev:local` | Bun server with local SQLite |
-| `bun run dev:client` | Watch + rebuild the React client |
-| `bun run build` | Build client + dry-run deploy |
-| `bun run deploy` | Build + deploy to Cloudflare |
+| `bun run dev` | Start the Wrangler development server with local D1 |
+| `bun run dev:local` | Start the Bun server with local SQLite |
+| `bun run dev:client` | Watch and rebuild the React client |
+| `bun run typecheck` | Type-check the browser, Worker, Bun, and tooling targets |
+| `bun test` | Run the Bun test suite |
+| `bun run build:client` | Build the React client |
+| `bunx wrangler deploy --dry-run` | Build the Worker without deploying |
+| `bun run build` | Run all validation and both production builds |
+| `bun run deploy` | Validate, build, and deploy to Cloudflare |
 | `bun run db:generate` | Generate a Drizzle migration |
 | `bun run db:migrate:local` | Apply migrations to local D1 |
 | `bun run db:migrate:remote` | Apply migrations to production D1 |
 | `bun run db:studio` | Open Drizzle Studio |
+
+Run each validation step independently:
+
+```bash
+bun run typecheck
+bun test
+bun run build:client
+bunx wrangler deploy --dry-run
+```
 
 ## Deploy to Cloudflare
 
@@ -156,38 +175,31 @@ bun run db:migrate:remote
 bun run deploy
 ```
 
-Set secrets:
+Set the optional admin token:
 
 ```bash
-bunx wrangler secret put SESSION_SECRET
-bunx wrangler secret put ADMIN_SYNC_TOKEN   # optional
+bunx wrangler secret put ADMIN_SYNC_TOKEN
 ```
 
-## Project structure
+## Runtime structure
 
 ```
 src/
   server/
-    index.ts              Hono app + Worker entrypoint
-    local.ts              Self-hosted Bun entrypoint
+    index.ts              Hono app, Cloudflare Worker, and scheduled sync entrypoint
+    local.ts              Self-hosted Bun and SQLite entrypoint
+    env.ts                Worker binding types
     db/schema.ts          Drizzle schema
-    lib/
-      anilist.ts          AniList GraphQL client
-      anime-mapping.ts    AniList/MAL → TVDB via Fribb
-      sync.ts             Background seasonal sync
-      auth.ts             Cookie-based sessions
-      local-d1.ts         D1-compatible SQLite adapter for self-hosting
-    routes/
-      auth.ts             Register, login, logout, session
-      anime.ts            Seasonal browse/feed + live search
-      lists.ts            CRUD lists/items + /sonarr feed
+    lib/                  Auth, upstream clients, caching, sync, and local D1 adapter
+    routes/               Auth, anime, and list HTTP routes
   client/
-    main.tsx              React entry
-    App.tsx               Hash router
-    api.ts                Typed fetch wrapper
-    hooks.ts              useUser, useSeasons
-    components/           Header, AnimeCard, AuthModal, AddToListModal
-    pages/                SeasonBrowser, MyLists, ListDetail
+    main.tsx              React entrypoint
+    App.tsx               Client router and page shell
+    api.ts                Typed API client
+    hooks.ts              Client data hooks
+    components/           Shared UI components
+    pages/                Season browser and list pages
+  shared/                 Types and season parsing shared by both runtimes
 ```
 
 ## Sonarr feed format

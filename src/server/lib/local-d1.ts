@@ -24,7 +24,7 @@ class LocalD1PreparedStatement {
     return statement;
   }
 
-  async all(): Promise<LocalD1Result> {
+  all(): LocalD1Result {
     const results = this.db.query(this.sql).all(...this.params) as Record<
       string,
       unknown
@@ -32,11 +32,11 @@ class LocalD1PreparedStatement {
     return { results, success: true, meta: {} };
   }
 
-  async raw(): Promise<unknown[][]> {
+  raw(): unknown[][] {
     return this.db.query(this.sql).values(...this.params) as unknown[][];
   }
 
-  async run(): Promise<LocalD1Result> {
+  run(): LocalD1Result {
     this.db.query(this.sql).run(...this.params);
     return { results: [], success: true, meta: {} };
   }
@@ -57,9 +57,9 @@ export function createLocalD1Database(dbPath: string): LocalD1Database {
     },
     async batch(statements: LocalD1PreparedStatement[]) {
       const results: LocalD1Result[] = [];
-      db.transaction(async () => {
+      db.transaction(() => {
         for (const statement of statements) {
-          results.push(await statement.run());
+          results.push(statement.run());
         }
       })();
       return results;
@@ -91,14 +91,12 @@ export async function migrateLocalD1Database(
       .map((statement) => statement.trim())
       .filter(Boolean);
 
-    for (const statement of statements) {
-      await d1.prepare(statement).run();
-    }
-
-    await d1
-      .prepare("INSERT INTO __local_migrations (name) VALUES (?)")
-      .bind(file)
-      .run();
+    await d1.batch([
+      ...statements.map((statement) => d1.prepare(statement)),
+      d1
+        .prepare("INSERT INTO __local_migrations (name) VALUES (?)")
+        .bind(file),
+    ]);
   }
 }
 
