@@ -10,7 +10,7 @@ Current stack:
 - `@chenglou/pretext` provides text measurement.
 - AniList, MyAnimeList, and Fribb anime-lists provide upstream metadata/mapping.
 
-Lean TypeScript configuration (simplified from eight files to four):
+Lean TypeScript configuration (simplified from nine files to four):
 - `tsconfig.json`: browser production code and shared modules; DOM + Vite types only.
 - `tsconfig.worker.json`: Cloudflare Worker/D1 production code, excluding Bun-only entry/adapter files; this is the authoritative guard against Bun/Node APIs leaking into the Worker.
 - `tsconfig.bun.json`: the Bun local runtime, tooling configs, and server integration/local-D1 tests. It includes the shared Worker application because the Bun entrypoint deliberately runs that application locally.
