@@ -25,6 +25,9 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Check Drizzle migrations
+        run: bun run db:check
+
       - name: Typecheck
         run: bun run typecheck
 

@@ -19,8 +19,9 @@
     "test": "bun test",
     "test:watch": "bun test --watch",
     "build:client": "bunx vite build",
-    "build": "bun run typecheck && bun run test && bun run build:client && bunx wrangler deploy --dry-run",
-    "deploy": "bun run typecheck && bun run test && bun run build:client && bunx wrangler deploy",
+    "build": "bun run db:check && bun run typecheck && bun run test && bun run build:client && bunx wrangler deploy --dry-run",
+    "deploy": "bun run db:check && bun run typecheck && bun run test && bun run build:client && bunx wrangler deploy",
+    "db:check": "bunx drizzle-kit check",
     "db:generate": "bunx drizzle-kit generate",
     "db:migrate:local": "bunx wrangler d1 migrations apply airing-list-db --local",
     "db:migrate:remote": "bunx wrangler d1 migrations apply airing-list-db --remote",
@@ -29,7 +30,7 @@
   "dependencies": {
     "@chenglou/pretext": "^0.0.5",
     "bcryptjs": "^3.0.3",
-    "drizzle-orm": "^0.41.0",
+    "drizzle-orm": "^0.45.2",
     "hono": "^4.12.29"
   },
   "devDependencies": {

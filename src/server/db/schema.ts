@@ -1,4 +1,10 @@
-import { sqliteTable, text, integer, primaryKey } from "drizzle-orm/sqlite-core";
+import {
+  index,
+  integer,
+  primaryKey,
+  sqliteTable,
+  text,
+} from "drizzle-orm/sqlite-core";
 
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
@@ -10,36 +16,48 @@ export const users = sqliteTable("users", {
     .$defaultFn(() => new Date()),
 });
 
-export const lists = sqliteTable("lists", {
-  id: text("id").primaryKey(),
-  userId: text("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  name: text("name").notNull(),
-  season: text("season"),
-  year: integer("year"),
-  createdAt: integer("created_at", { mode: "timestamp" })
-    .notNull()
-    .$defaultFn(() => new Date()),
-});
+export const lists = sqliteTable(
+  "lists",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    season: text("season"),
+    year: integer("year"),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (table) => [
+    index("lists_user_created_idx").on(table.userId, table.createdAt),
+  ]
+);
 
-export const listItems = sqliteTable("list_items", {
-  id: text("id").primaryKey(),
-  listId: text("list_id")
-    .notNull()
-    .references(() => lists.id, { onDelete: "cascade" }),
-  anilistId: integer("anilist_id").notNull(),
-  title: text("title").notNull(),
-  titleEnglish: text("title_english"),
-  coverImage: text("cover_image"),
-  format: text("format"),
-  status: text("status"),
-  episodes: integer("episodes"),
-  score: integer("score"),
-  addedAt: integer("added_at", { mode: "timestamp" })
-    .notNull()
-    .$defaultFn(() => new Date()),
-});
+export const listItems = sqliteTable(
+  "list_items",
+  {
+    id: text("id").primaryKey(),
+    listId: text("list_id")
+      .notNull()
+      .references(() => lists.id, { onDelete: "cascade" }),
+    anilistId: integer("anilist_id").notNull(),
+    title: text("title").notNull(),
+    titleEnglish: text("title_english"),
+    coverImage: text("cover_image"),
+    format: text("format"),
+    status: text("status"),
+    episodes: integer("episodes"),
+    score: integer("score"),
+    addedAt: integer("added_at", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (table) => [
+    index("list_items_list_added_idx").on(table.listId, table.addedAt),
+  ]
+);
 
 // Persisted TVDB IDs per season, merged from AniList + MAL
 export const seasonFeedEntries = sqliteTable(
@@ -52,7 +70,16 @@ export const seasonFeedEntries = sqliteTable(
     syncRunAt: integer("sync_run_at").notNull(),
     updatedAt: integer("updated_at").notNull(),
   },
-  (t) => [primaryKey({ columns: [t.season, t.year, t.source, t.tvdbId] })]
+  (table) => [
+    primaryKey({
+      columns: [table.season, table.year, table.source, table.tvdbId],
+    }),
+    index("season_feed_entries_season_tvdb_idx").on(
+      table.season,
+      table.year,
+      table.tvdbId
+    ),
+  ]
 );
 
 // Tracks incremental sync state per (season, year, source)
@@ -102,7 +129,15 @@ export const seasonalBrowseItems = sqliteTable(
     syncRunAt: integer("sync_run_at").notNull(),
     updatedAt: integer("updated_at").notNull(),
   },
-  (t) => [primaryKey({ columns: [t.season, t.year, t.anilistId] })]
+  (table) => [
+    primaryKey({ columns: [table.season, table.year, table.anilistId] }),
+    index("seasonal_browse_items_page_idx").on(
+      table.season,
+      table.year,
+      table.page,
+      table.sortOrder
+    ),
+  ]
 );
 
 

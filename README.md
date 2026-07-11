@@ -151,14 +151,21 @@ docker compose logs -f app
 | `bunx wrangler deploy --dry-run` | Build the Worker without deploying |
 | `bun run build` | Run all validation and both production builds |
 | `bun run deploy` | Validate, build, and deploy to Cloudflare |
+| `bun run db:check` | Validate Drizzle migration journal and snapshots |
 | `bun run db:generate` | Generate a Drizzle migration |
 | `bun run db:migrate:local` | Apply migrations to local D1 |
 | `bun run db:migrate:remote` | Apply migrations to production D1 |
 | `bun run db:studio` | Open Drizzle Studio |
 
+The authored schema lives in `src/server/db/schema.ts`; generated SQL, snapshots,
+and the journal live together in the conventional root `drizzle/` directory.
+Commit those generated artifacts together and never edit a migration that has
+already been applied. Create a new migration for every subsequent schema change.
+
 Run each validation step independently:
 
 ```bash
+bun run db:check
 bun run typecheck
 bun test
 bun run build:client

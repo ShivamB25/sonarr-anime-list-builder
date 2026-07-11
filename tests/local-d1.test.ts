@@ -97,4 +97,54 @@ describe("local D1 migrations", () => {
       database.prepare("SELECT name FROM __local_migrations").all().results
     ).toEqual([{ name: "0000_retry.sql" }]);
   });
+
+  test("replays the committed migration history into the final schema", async () => {
+    await migrateLocalD1Database(
+      database,
+      join(import.meta.dir, "../drizzle")
+    );
+
+    const applicationTables = database
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('entries', '__local_migrations') ORDER BY name"
+      )
+      .all().results;
+    expect(applicationTables).toEqual([
+      { name: "list_items" },
+      { name: "lists" },
+      { name: "season_feed_entries" },
+      { name: "season_feed_sync" },
+      { name: "seasonal_browse_items" },
+      { name: "users" },
+    ]);
+
+    const queryIndexes = database
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE type = 'index' AND name IN (?, ?, ?, ?) ORDER BY name"
+      )
+      .bind(
+        "list_items_list_added_idx",
+        "lists_user_created_idx",
+        "season_feed_entries_season_tvdb_idx",
+        "seasonal_browse_items_page_idx"
+      )
+      .all().results;
+    expect(queryIndexes).toEqual([
+      { name: "list_items_list_added_idx" },
+      { name: "lists_user_created_idx" },
+      { name: "season_feed_entries_season_tvdb_idx" },
+      { name: "seasonal_browse_items_page_idx" },
+    ]);
+
+    const appliedMigrations = database
+      .prepare("SELECT name FROM __local_migrations ORDER BY name")
+      .all().results;
+    expect(appliedMigrations).toEqual([
+      { name: "0000_lame_banshee.sql" },
+      { name: "0001_lovely_meteorite.sql" },
+      { name: "0002_zippy_captain_stacy.sql" },
+      { name: "0003_mysterious_warbird.sql" },
+      { name: "0004_add_query_indexes.sql" },
+    ]);
+  });
 });
