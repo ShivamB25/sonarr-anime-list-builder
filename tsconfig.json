@@ -1,10 +1,23 @@
 {
-  "files": [],
-  "references": [
-    { "path": "./tsconfig.browser.json" },
-    { "path": "./tsconfig.worker.json" },
-    { "path": "./tsconfig.bun.json" },
-    { "path": "./tsconfig.tooling.json" },
-    { "path": "./tsconfig.test.json" }
-  ]
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "types": ["vite/client"],
+    "jsx": "react-jsx",
+    "rootDir": "."
+  },
+  "include": [
+    "src/client/**/*.ts",
+    "src/client/**/*.tsx",
+    "src/shared/**/*.ts"
+  ],
+  "exclude": ["node_modules"]
 }

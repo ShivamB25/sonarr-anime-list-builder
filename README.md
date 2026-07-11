@@ -145,7 +145,7 @@ docker compose logs -f app
 | `bun run dev` | Start the Wrangler development server with local D1 |
 | `bun run dev:local` | Start the Bun server with local SQLite |
 | `bun run dev:client` | Watch and rebuild the React client |
-| `bun run typecheck` | Type-check the browser, Worker, Bun, and tooling targets |
+| `bun run typecheck` | Type-check the browser, Worker, Bun/tooling, and tests |
 | `bun test` | Run the Bun test suite |
 | `bun run build:client` | Build the React client |
 | `bunx wrangler deploy --dry-run` | Build the Worker without deploying |

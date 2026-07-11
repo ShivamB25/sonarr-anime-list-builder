@@ -1,7 +1,10 @@
 {
-  "files": [],
-  "references": [
-    { "path": "./tsconfig.test.browser.json" },
-    { "path": "./tsconfig.test.server.json" }
-  ]
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["bun"],
+    "rootDir": "."
+  },
+  "include": ["tests/client-api.test.ts", "tests/season.test.ts"],
+  "exclude": ["node_modules"]
 }
