@@ -28,7 +28,7 @@ app.post("/api/admin/run-sync", async (c) => {
   }
 
   try {
-    const result = await runSync(c.env.DB, c.env.MAL_CLIENT_ID, true);
+    const result = await runSync(c.env.DB, c.env.MAL_CLIENT_ID, c.env.TVDB_API_KEY, true);
     return c.json({ ok: true, result });
   } catch {
     return c.json({ ok: false, error: "Internal server error" }, 500);
@@ -47,7 +47,7 @@ export default {
     env: AppBindings,
     ctx: ExecutionContext
   ) => {
-    ctx.waitUntil(runSync(env.DB, env.MAL_CLIENT_ID));
+    ctx.waitUntil(runSync(env.DB, env.MAL_CLIENT_ID, env.TVDB_API_KEY));
   },
 } satisfies ExportedHandler<AppBindings>;
 

@@ -54,6 +54,7 @@ The image bundles a compiled Bun/Hono binary, the built React client, and Drizzl
 | --- | --- | --- |
 | `ADMIN_SYNC_TOKEN` | no | Bearer token for the `/api/admin/run-sync` endpoint |
 | `MAL_CLIENT_ID` | no | MyAnimeList API client ID; enables MAL as a sync source |
+| `TVDB_API_KEY` | no | TVDB v4 API key; resolves missing TVDB mappings after the Fribb lookup |
 | `SQLITE_PATH` | no | SQLite database path (default `/app/data/airing-list.sqlite`) |
 
 ### Production (pull from Docker Hub)
@@ -70,6 +71,7 @@ services:
     environment:
       ADMIN_SYNC_TOKEN: "a-long-random-admin-token"
       # MAL_CLIENT_ID: "your-mal-client-id"
+      # TVDB_API_KEY: "your-tvdb-api-key"
       # SQLITE_PATH: /app/data/airing-list.sqlite
     volumes:
       - airing-list-data:/app/data
@@ -184,9 +186,11 @@ bun run db:migrate:remote
 bun run deploy
 ```
 
-Set the optional admin token:
+Set optional API credentials and the admin token as Worker secrets:
 
 ```bash
+bunx wrangler secret put MAL_CLIENT_ID
+bunx wrangler secret put TVDB_API_KEY
 bunx wrangler secret put ADMIN_SYNC_TOKEN
 ```
 

@@ -243,7 +243,8 @@ async function ensureSyncRow(
 async function syncAnilistPage(
   db: ReturnType<typeof drizzle>,
   season: string,
-  year: number
+  year: number,
+  tvdbApiKey?: string
 ): Promise<void> {
   await ensureSyncRow(db, season, year, "anilist");
   const state = await getSyncState(db, season, year, "anilist");
@@ -271,10 +272,19 @@ async function syncAnilistPage(
   const syncRunAt = state.lastSyncedAt ?? Date.now();
   const data = await gqlRequestPage(season, year, page, ANILIST_PER_PAGE);
   await upsertBrowseItems(db, season, year, syncRunAt, data.media);
-  const anilistIds = data.media
-    .filter((media: AniListMedia) => isSeasonFeedAniListEntry(media, year))
-    .map((m: AniListMedia) => m.id);
-  const tvdbMap = await batchGetTvdbIds(anilistIds);
+  const eligibleMedia = data.media.filter((media: AniListMedia) =>
+    isSeasonFeedAniListEntry(media, year)
+  );
+  const anilistIds = eligibleMedia.map((media: AniListMedia) => media.id);
+  const tvdbMap = await batchGetTvdbIds(
+    anilistIds,
+    eligibleMedia.map((media: AniListMedia) => ({
+      id: media.id,
+      title: media.title.english ?? media.title.romaji,
+      year: media.startDate.year,
+    })),
+    tvdbApiKey
+  );
   await upsertTvdbIds(
     db,
     season,
@@ -309,7 +319,8 @@ async function syncMAL(
   db: ReturnType<typeof drizzle>,
   season: string,
   year: number,
-  malClientId: string
+  malClientId: string,
+  tvdbApiKey?: string
 ): Promise<void> {
   await ensureSyncRow(db, season, year, "mal");
   const state = await getSyncState(db, season, year, "mal");
@@ -333,10 +344,17 @@ async function syncMAL(
   // MAL fetches everything in one call (limit 500), so always mark done after one sync
   const syncRunAt = Date.now();
   const malMedia = await getAllMALSeasonalAnime(season, year, malClientId);
-  const malIds = malMedia
-    .filter((media) => isSeasonFeedMALEntry(media, year))
-    .map((m) => m.id);
-  const tvdbMap = await batchGetTvdbIdsFromMal(malIds);
+  const eligibleMedia = malMedia.filter((media) => isSeasonFeedMALEntry(media, year));
+  const malIds = eligibleMedia.map((media) => media.id);
+  const tvdbMap = await batchGetTvdbIdsFromMal(
+    malIds,
+    eligibleMedia.map((media) => ({
+      id: media.id,
+      title: media.title,
+      year: Number(media.start_date!.slice(0, 4)),
+    })),
+    tvdbApiKey
+  );
   await upsertTvdbIds(db, season, year, "mal", syncRunAt, Array.from(tvdbMap.values()));
   await cleanupSourceRows(db, season, year, "mal", syncRunAt);
 
@@ -367,6 +385,7 @@ export type SyncResult = {
 export async function runSync(
   d1: D1Database,
   malClientId: string,
+  tvdbApiKey?: string,
   failFast = false
 ): Promise<SyncResult> {
   const db = drizzle(d1);
@@ -375,7 +394,7 @@ export async function runSync(
 
   for (const { season, year } of targets) {
     try {
-      await syncAnilistPage(db, season, year);
+      await syncAnilistPage(db, season, year, tvdbApiKey);
     } catch (error) {
       const syncError = {
         season,
@@ -393,7 +412,7 @@ export async function runSync(
 
     if (malClientId) {
       try {
-        await syncMAL(db, season, year, malClientId);
+        await syncMAL(db, season, year, malClientId, tvdbApiKey);
       } catch (error) {
         const syncError = {
           season,

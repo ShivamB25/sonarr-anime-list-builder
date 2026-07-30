@@ -20,6 +20,7 @@ const env = {
   DB: localDb as unknown as D1Database,
   MAL_CLIENT_ID: process.env.MAL_CLIENT_ID ?? "",
   ADMIN_SYNC_TOKEN: process.env.ADMIN_SYNC_TOKEN ?? "",
+  TVDB_API_KEY: process.env.TVDB_API_KEY,
 } satisfies AppBindings;
 
 serve({
