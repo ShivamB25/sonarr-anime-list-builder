@@ -25,7 +25,7 @@ Guest sessions are automatic (cookie-based). Create an account if you want lists
 
 ## Setup
 
-Use Bun 1.3.14. The project uses the stable TypeScript 7 release.
+Use Bun 1.4.0. The project uses the stable TypeScript 7 release.
 
 ```bash
 bun install --frozen-lockfile
@@ -41,6 +41,18 @@ For the self-hosted Bun runtime with local SQLite, build the client first:
 bun run build:client
 bun run dev:local
 ```
+
+## Runtime compatibility
+
+| Path | Runtime | Bun-native APIs |
+| --- | --- | --- |
+| Self-hosted server and Docker image | Bun 1.4.0 | Supported in `src/server/local.ts` and `src/server/lib/local-d1.ts` |
+| Cloudflare deployment | `workerd` via Wrangler | Not supported; use Web Platform and Workers APIs |
+| Wrangler CLI | Node.js 22+ | Wrangler is installed with Bun, but `bunx` follows its Node shebang |
+
+`tsconfig.worker.json` enforces this boundary by excluding the Bun-only
+entrypoint and local D1 adapter. Do not run Wrangler with `bunx --bun` or import
+those local-runtime modules into code reachable from `src/server/index.ts`.
 
 ## Docker
 

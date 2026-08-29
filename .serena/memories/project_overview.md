@@ -7,7 +7,8 @@ Repository identity:
 - The deployed Cloudflare Worker intentionally retains the existing name `airing-list-web`; repository branding and deployment resource names do not need to match.
 
 Current stack:
-- Bun 1.3.14 is the only package manager, command runner, local runtime, and test runner.
+- Bun 1.4.0 is the package manager, application command runner, local runtime, test runner, and self-hosted compiler.
+- Wrangler is installed through Bun but executes under Node.js 22+ and targets Cloudflare's `workerd` runtime.
 - Stable TypeScript 7.0.2 provides static checking.
 - Cloudflare Workers + Hono provide the backend.
 - Cloudflare D1 + Drizzle ORM 0.45.2 provide persistence; Drizzle Kit 0.31.10 generates and validates migrations.

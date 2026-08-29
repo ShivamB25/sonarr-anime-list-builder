@@ -1,4 +1,3 @@
-import { serve } from "bun";
 import { join, normalize } from "node:path";
 import { app } from "./index";
 import type { AppBindings } from "./env";
@@ -8,9 +7,9 @@ import {
   migrateLocalD1Database,
 } from "./lib/local-d1";
 
-const port = Number(process.env.PORT ?? "8787");
-const dbPath = process.env.SQLITE_PATH ?? "./data/airing-list.sqlite";
-const assetsDir = process.env.ASSETS_DIR ?? "./dist/client";
+const port = Number(Bun.env.PORT ?? "8787");
+const dbPath = Bun.env.SQLITE_PATH ?? "./data/airing-list.sqlite";
+const assetsDir = Bun.env.ASSETS_DIR ?? "./dist/client";
 
 await ensureSqliteDirectory(dbPath);
 const localDb = createLocalD1Database(dbPath);
@@ -18,12 +17,12 @@ await migrateLocalD1Database(localDb, "./drizzle");
 
 const env = {
   DB: localDb as unknown as D1Database,
-  MAL_CLIENT_ID: process.env.MAL_CLIENT_ID ?? "",
-  ADMIN_SYNC_TOKEN: process.env.ADMIN_SYNC_TOKEN ?? "",
-  TVDB_API_KEY: process.env.TVDB_API_KEY,
+  MAL_CLIENT_ID: Bun.env.MAL_CLIENT_ID ?? "",
+  ADMIN_SYNC_TOKEN: Bun.env.ADMIN_SYNC_TOKEN ?? "",
+  TVDB_API_KEY: Bun.env.TVDB_API_KEY,
 } satisfies AppBindings;
 
-serve({
+Bun.serve({
   port,
   async fetch(request) {
     const url = new URL(request.url);

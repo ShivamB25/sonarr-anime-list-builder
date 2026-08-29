@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile } from "node:fs/promises";
+import { mkdir, readdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { Database } from "bun:sqlite";
 
@@ -85,7 +85,7 @@ export async function migrateLocalD1Database(
 
     if (existing.results.length > 0) continue;
 
-    const sql = await readFile(join(migrationsDir, file), "utf8");
+    const sql = await Bun.file(join(migrationsDir, file)).text();
     const statements = sql
       .split("--> statement-breakpoint")
       .map((statement) => statement.trim())
