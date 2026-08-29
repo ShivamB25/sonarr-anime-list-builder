@@ -1,4 +1,5 @@
 import type {
+  AnimeMedia,
   AnimePage,
   List,
   ListDetail,
@@ -71,6 +72,27 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return body as T;
 }
 
+async function seasonalAnime(
+  season: string,
+  year: number,
+  signal?: AbortSignal
+): Promise<AnimeMedia[]> {
+  const firstPage = await request<AnimePage>(
+    `/anime/seasonal?season=${season}&year=${year}&page=1`,
+    { signal }
+  );
+  const remainingPages = await Promise.all(
+    Array.from({ length: Math.max(0, firstPage.pageInfo.lastPage - 1) }, (_, index) =>
+      request<AnimePage>(
+        `/anime/seasonal?season=${season}&year=${year}&page=${index + 2}`,
+        { signal }
+      )
+    )
+  );
+
+  return [firstPage, ...remainingPages].flatMap((page) => page.media);
+}
+
 export const api = {
   auth: {
     session: (signal?: AbortSignal) =>
@@ -82,8 +104,7 @@ export const api = {
     logout: () => request<void>("/auth/logout", { method: "POST" }),
   },
   anime: {
-    seasonal: (season: string, year: number, page = 1, signal?: AbortSignal) =>
-      request<AnimePage>(`/anime/seasonal?season=${season}&year=${year}&page=${page}`, { signal }),
+    seasonal: seasonalAnime,
     search: (q: string, page = 1, signal?: AbortSignal) =>
       request<AnimePage>(`/anime/search?q=${encodeURIComponent(q)}&page=${page}`, { signal }),
   },

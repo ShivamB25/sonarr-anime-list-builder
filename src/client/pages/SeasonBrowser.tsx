@@ -13,40 +13,31 @@ export default function SeasonBrowser() {
   const [year, setYear] = useState(currentYear);
   const [anime, setAnime] = useState<AnimeMedia[]>([]);
   const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [hasNext, setHasNext] = useState(false);
   const [search, setSearch] = useState("");
   const [addTarget, setAddTarget] = useState<AnimeMedia | null>(null);
   const [error, setError] = useState("");
   const requestVersion = useRef(0);
-  const loadingMoreRef = useRef(false);
 
   useEffect(() => {
     const controller = new AbortController();
     const version = requestVersion.current + 1;
     requestVersion.current = version;
     setLoading(true);
-    setLoadingMore(false);
-    loadingMoreRef.current = false;
-    setPage(1);
     setError("");
 
     async function load() {
       try {
         const query = search.trim();
-        const data = query
-          ? await api.anime.search(query, 1, controller.signal)
-          : await api.anime.seasonal(season, year, 1, controller.signal);
+        const media = query
+          ? (await api.anime.search(query, 1, controller.signal)).media
+          : await api.anime.seasonal(season, year, controller.signal);
 
         if (requestVersion.current === version) {
-          setAnime(data.media);
-          setHasNext(data.pageInfo.hasNextPage);
+          setAnime(media);
         }
       } catch (loadError) {
         if (!isAbortError(loadError) && requestVersion.current === version) {
           setAnime([]);
-          setHasNext(false);
           setError(getErrorMessage(loadError, "Unable to load anime."));
         }
       } finally {
@@ -60,35 +51,6 @@ export default function SeasonBrowser() {
     return () => controller.abort();
   }, [season, year, search]);
 
-  async function loadMore() {
-    if (loadingMoreRef.current) return;
-    loadingMoreRef.current = true;
-    setLoadingMore(true);
-    const version = requestVersion.current;
-    setError("");
-    const nextPage = page + 1;
-
-    try {
-      const data = search.trim()
-        ? await api.anime.search(search.trim(), nextPage)
-        : await api.anime.seasonal(season, year, nextPage);
-
-      if (requestVersion.current === version) {
-        setAnime((prev) => [...prev, ...data.media]);
-        setHasNext(data.pageInfo.hasNextPage);
-        setPage(nextPage);
-      }
-    } catch (loadError) {
-      if (requestVersion.current === version) {
-        setError(getErrorMessage(loadError, "Unable to load more anime."));
-      }
-    } finally {
-      if (requestVersion.current === version) {
-        loadingMoreRef.current = false;
-        setLoadingMore(false);
-      }
-    }
-  }
 
   return (
     <div>
@@ -177,20 +139,7 @@ export default function SeasonBrowser() {
           <div className="animate-spin w-8 h-8 border-2 border-[var(--accent)] border-t-transparent rounded-full" />
         </div>
       ) : anime.length > 0 ? (
-        <>
-          <VirtualAnimeGrid anime={anime} onAdd={setAddTarget} />
-          {hasNext && (
-            <div className="flex justify-center mt-8">
-              <button
-                onClick={() => void loadMore()}
-                disabled={loadingMore}
-                className="px-6 py-2 bg-[var(--bg-secondary)] hover:bg-white/10 border border-white/10 rounded-lg transition disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {loadingMore ? "Loading..." : "Load More"}
-              </button>
-            </div>
-          )}
-        </>
+        <VirtualAnimeGrid anime={anime} onAdd={setAddTarget} />
       ) : !error ? (
         <p className="text-center text-[var(--text-secondary)] py-20">
           No anime found for this season.

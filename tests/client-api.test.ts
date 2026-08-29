@@ -59,6 +59,31 @@ describe("client API request policy", () => {
   });
 });
 
+describe("seasonal API loading", () => {
+  test("loads every season page without a manual continuation", async () => {
+    const requestedPages: number[] = [];
+    globalThis.fetch = (async (input: Parameters<typeof fetch>[0]) => {
+      const url = new URL(String(input), "https://example.test");
+      const page = Number(url.searchParams.get("page"));
+      requestedPages.push(page);
+      return Response.json({
+        pageInfo: {
+          hasNextPage: page < 3,
+          currentPage: page,
+          lastPage: 3,
+          total: 3,
+        },
+        media: [{ id: page }],
+      });
+    }) as typeof fetch;
+
+    const media = await api.anime.seasonal("SUMMER", 2026);
+
+    expect(requestedPages).toEqual([1, 2, 3]);
+    expect(media.map((anime) => anime.id)).toEqual([1, 2, 3]);
+  });
+});
+
 describe("ApiError response handling", () => {
   test("uses the server error message from a JSON error response", async () => {
     installFetch(Response.json({ error: "List not found" }, { status: 404 }));
