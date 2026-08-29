@@ -4,7 +4,6 @@ import type {
   List,
   ListDetail,
   ListItem,
-  User,
 } from "../shared/types";
 
 const BASE = "/api";
@@ -94,15 +93,6 @@ async function seasonalAnime(
 }
 
 export const api = {
-  auth: {
-    session: (signal?: AbortSignal) =>
-      request<User>("/auth/session", { signal }),
-    register: (username: string, password: string) =>
-      request<User>("/auth/register", { method: "POST", body: JSON.stringify({ username, password }) }),
-    login: (username: string, password: string) =>
-      request<User>("/auth/login", { method: "POST", body: JSON.stringify({ username, password }) }),
-    logout: () => request<void>("/auth/logout", { method: "POST" }),
-  },
   anime: {
     seasonal: seasonalAnime,
     search: (q: string, page = 1, signal?: AbortSignal) =>

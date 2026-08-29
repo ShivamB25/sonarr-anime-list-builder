@@ -1,20 +1,120 @@
 @import "tailwindcss";
 
 :root {
-  --bg-primary: #0f0f0f;
-  --bg-secondary: #1a1a2e;
-  --bg-card: #16213e;
-  --accent: #e94560;
-  --accent-hover: #ff6b81;
-  --text-primary: #eee;
-  --text-secondary: #a0a0b0;
+  --background: #090a0d;
+  --surface: #11141a;
+  --surface-raised: #181c24;
+  --foreground: #f5f3ec;
+  --muted: #a8abb3;
+  --border: #303540;
+  --accent: #ff7a4f;
+  --accent-strong: #ff9a78;
+  --accent-ink: #1c0b05;
+  --info: #8ecbff;
+  --success: #7bdba4;
+  --danger: #ff8585;
+  --focus: #ffd4c6;
+  --font-body: "Avenir Next", Avenir, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-display-stack: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-ink: var(--accent-ink);
+  --color-info: var(--info);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display-stack);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  background: var(--background);
+  color-scheme: dark;
 }
 
 body {
   margin: 0;
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  font-family:
-    system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  min-width: 320px;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background:
+    radial-gradient(circle at 12% -12%, rgb(255 122 79 / 14%), transparent 30rem),
+    radial-gradient(circle at 92% 8%, rgb(142 203 255 / 8%), transparent 28rem),
+    var(--background);
+  color: var(--foreground);
+  font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button,
+a,
+input,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+dialog:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.dialog-shell {
+  color: var(--foreground);
+}
+
+.dialog-shell::backdrop {
+  background: rgb(3 4 7 / 78%);
+  backdrop-filter: blur(8px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media (forced-colors: active) {
+  :root {
+    --border: CanvasText;
+    --focus: Highlight;
+  }
+
+  .dialog-shell::backdrop {
+    background: Canvas;
+    opacity: 0.8;
+  }
 }

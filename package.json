@@ -40,7 +40,6 @@
     "db:studio": "bunx drizzle-kit studio"
   },
   "dependencies": {
-    "@chenglou/pretext": "^0.0.5",
     "bcryptjs": "^3.0.3",
     "drizzle-orm": "^0.45.2",
     "hono": "^4.13.5"

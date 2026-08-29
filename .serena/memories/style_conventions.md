@@ -10,7 +10,11 @@ Client conventions:
 - Functional React components, local `type Props` aliases, async/await, explicit loading/error states, and cancellation/generation guards for request effects.
 - Keep state local to the page/dialog that owns it; no global state library is currently justified.
 - Use semantic native controls and visible safe error feedback.
-- UI styling uses Tailwind utilities plus CSS custom properties from `src/client/index.css`.
+- UI styling uses Tailwind v4 utilities plus semantic theme variables from `src/client/index.css`; that file is the token source of truth.
+- The interface is anonymous-first: no signup/login/password/profile UI. Preserve the server guest-session cookie because it owns each browser's lists.
+- Keep the seasonal catalog's dark editorial direction: warm coral actions, serif display headings, compact sans metadata, restrained borders, and image-led cards.
+- Support 320 CSS pixels without horizontal overflow; narrow page grids containing long URLs need `grid-cols-[minmax(0,1fr)]`.
+- Required actions stay visible for keyboard, touch, and pointer input. Native dialogs must trap focus, close with Escape, and restore focus to the invoker.
 
 Server conventions:
 - Keep small Hono route modules and the current `routes/lib/db` boundaries.

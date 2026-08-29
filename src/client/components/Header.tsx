@@ -1,58 +1,47 @@
-import type { User } from "../../shared/types";
-
 type Props = {
-  user: User | null;
-  onNavigate: (hash: string) => void;
-  onAuthClick: () => void;
-  onLogout: () => void;
+  activePage: "browse" | "lists";
 };
 
-export default function Header({ user, onNavigate, onAuthClick, onLogout }: Props) {
+function BrandMark() {
   return (
-    <header className="sticky top-0 z-50 bg-[var(--bg-secondary)]/95 backdrop-blur border-b border-white/10">
-      <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
-        <div className="flex items-center gap-6">
-          <button
-            onClick={() => onNavigate("")}
-            className="text-lg font-bold text-[var(--accent)] hover:text-[var(--accent-hover)] transition"
-          >
+    <svg aria-hidden="true" className="size-8" viewBox="0 0 32 32" fill="none">
+      <rect width="32" height="32" rx="10" fill="currentColor" />
+      <path d="M9 21.5 13.2 10h5.6L23 21.5h-3.6l-.75-2.35h-5.4l-.75 2.35H9Zm5.15-5.2h3.6L16 11.1l-1.85 5.2Z" fill="currentColor" className="text-accent-ink" />
+    </svg>
+  );
+}
+
+export default function Header({ activePage }: Props) {
+  return (
+    <header className="sticky top-0 z-50 border-b border-border/80 bg-background/90 backdrop-blur-xl">
+      <div className="mx-auto flex min-h-16 w-full max-w-[90rem] items-center justify-between gap-3 px-3 sm:px-6 lg:px-10">
+        <a
+          href="#"
+          className="flex min-h-11 items-center gap-2 rounded-xl text-accent transition-colors hover:text-accent-strong"
+          aria-label="Airing List, browse seasons"
+        >
+          <BrandMark />
+          <span className="hidden font-display text-xl font-semibold tracking-tight text-foreground min-[350px]:inline">
             Airing List
-          </button>
-          <nav className="flex gap-4 text-sm">
-            <button
-              onClick={() => onNavigate("")}
-              className="text-[var(--text-secondary)] hover:text-white transition"
-            >
-              Browse
-            </button>
-            <button
-              onClick={() => onNavigate("lists")}
-              className="text-[var(--text-secondary)] hover:text-white transition"
-            >
-              My Lists
-            </button>
-          </nav>
-        </div>
-        <div className="flex items-center gap-3 text-sm">
-          {!user || user.isGuest ? (
-            <button
-              onClick={onAuthClick}
-              className="px-3 py-1.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded transition"
-            >
-              Sign Up / Login
-            </button>
-          ) : (
-            <>
-              <span className="text-[var(--text-secondary)]">{user?.username}</span>
-              <button
-                onClick={onLogout}
-                className="px-3 py-1.5 border border-white/20 hover:border-white/40 rounded transition"
-              >
-                Logout
-              </button>
-            </>
-          )}
-        </div>
+          </span>
+        </a>
+
+        <nav aria-label="Primary navigation" className="flex items-center gap-1 rounded-xl border border-border bg-surface p-1">
+          <a
+            href="#"
+            aria-current={activePage === "browse" ? "page" : undefined}
+            className="flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold text-muted transition-colors hover:bg-surface-raised hover:text-foreground aria-[current=page]:bg-accent aria-[current=page]:text-accent-ink sm:min-h-11 sm:px-4"
+          >
+            Browse
+          </a>
+          <a
+            href="#lists"
+            aria-current={activePage === "lists" ? "page" : undefined}
+            className="flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold text-muted transition-colors hover:bg-surface-raised hover:text-foreground aria-[current=page]:bg-accent aria-[current=page]:text-accent-ink sm:min-h-11 sm:px-4"
+          >
+            My lists
+          </a>
+        </nav>
       </div>
     </header>
   );
