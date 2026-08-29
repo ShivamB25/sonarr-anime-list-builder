@@ -185,10 +185,11 @@ async function upsertBrowseItems(
     nextAiringEpisode: { airingAt: number; episode: number; timeUntilAiring: number } | null;
     startDate: { year: number; month: number; day: number };
     studios: { nodes: { name: string }[] };
-  }[]
+  }[],
+  startSortOrder: number
 ): Promise<void> {
   for (let i = 0; i < media.length; i++) {
-    await upsertBrowseItem(db, season, year, syncRunAt, media[i], i);
+    await upsertBrowseItem(db, season, year, syncRunAt, media[i], startSortOrder + i);
   }
 }
 
@@ -271,7 +272,14 @@ async function syncAnilistPage(
   const page = state.nextPage;
   const syncRunAt = state.lastSyncedAt ?? Date.now();
   const data = await gqlRequestPage(season, year, page, ANILIST_PER_PAGE);
-  await upsertBrowseItems(db, season, year, syncRunAt, data.media);
+  await upsertBrowseItems(
+    db,
+    season,
+    year,
+    syncRunAt,
+    data.media,
+    (page - 1) * ANILIST_PER_PAGE
+  );
   const eligibleMedia = data.media.filter((media: AniListMedia) =>
     isSeasonFeedAniListEntry(media, year)
   );
