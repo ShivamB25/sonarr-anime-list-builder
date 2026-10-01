@@ -87,6 +87,9 @@ those local-runtime modules into code reachable from `src/server/index.ts`.
 
 Pre-built image: **`shivamb25/anime-airing-list`** ([Docker Hub](https://hub.docker.com/repository/docker/shivamb25/anime-airing-list))
 
+CI no longer publishes or refreshes Docker Hub images. Registry tags may lag
+behind the source; build locally when you need the current code.
+
 The image bundles a compiled Bun/Hono binary, the built React client, and Drizzle migrations. Data lives in SQLite at `/app/data/airing-list.sqlite`; migrations run automatically on startup.
 
 ### Configuration
@@ -184,6 +187,11 @@ docker compose logs -f app
 ```
 
 ## Development and validation
+
+The `CI` workflow (`.github/workflows/ci.yml`) runs the frozen Bun install,
+migration check, type checks, isolated tests, and client build. It does not log
+in to Docker Hub or publish images. Cloudflare deployment remains an explicit
+`bun run deploy` operation through Wrangler.
 
 | Command | Description |
 | --- | --- |
