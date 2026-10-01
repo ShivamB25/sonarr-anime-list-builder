@@ -1,8 +1,33 @@
 # Sonarr Anime List Builder
 
-Open-source seasonal anime import-list builder for Sonarr. Browse AniList and
+Source-available seasonal anime import-list builder for Sonarr. Browse AniList and
 MyAnimeList metadata, create custom lists, and expose Sonarr-compatible TVDB
 feeds. Run it on Cloudflare Workers with D1 or self-host it with Bun and SQLite.
+
+## License and AI use
+
+Copyright © 2026 Shivam Bansal and contributors. See [LICENSE](LICENSE) for the
+**Airing List No-Training Attribution License 1.0**, a custom source-available
+license, not the MIT License or an OSI-approved open-source license.
+
+- Use, modification, self-hosting, and redistribution are allowed under the
+  license's attribution requirements. Retain the license, author/contributor
+  notices, project name, and source URL. Publicly distributed or hosted modified
+  versions must credit the project in their README, documentation, or credits.
+- Automated harvesting for training, model training, fine-tuning, distillation,
+  and supplying derived training datasets require separate prior written
+  permission. This applies to commercial, noncommercial, and open-weight models.
+- Separately authorized training must acknowledge the project and its authors in
+  the relevant dataset and model documentation. Attribution alone is not permission.
+- AI-assisted coding, review, indexing, and pull requests are welcome when the
+  repository material, prompts, responses, and patches are not used for training.
+- Third-party libraries, artwork, and metadata retain their own terms. Existing
+  rights previously granted under other licenses are not revoked.
+
+The license and [agent instructions](AGENTS.md) are legal and policy notices,
+not a technical scraper block. Copyright exceptions and enforceability depend
+on applicable law; obtain legal review before relying on these custom terms.
+Research reference: [Non-AI license templates](https://github.com/non-ai-licenses/non-ai-licenses).
 
 ## Stack
 
@@ -21,7 +46,36 @@ feeds. Run it on Cloudflare Workers with D1 or self-host it with Bun and SQLite.
 4. Each list exposes a Sonarr-compatible feed at `/api/lists/{id}/sonarr`.
 5. Paste that URL into **Sonarr → Import Lists → Custom List → List URL**. No API key needed.
 
-Guest sessions are automatic (cookie-based). Create an account if you want lists to survive across devices.
+Guest sessions are automatic and cookie-based. Lists belong to that browser;
+there is no account UI or cross-device account sync.
+
+### Seasonal coverage
+
+- `/api/anime/seasonal` browses AniList's season-of-release catalog.
+- `/api/anime/season-feed` merges TVDB mappings from AniList TV, TV-short, and
+  ONA entries with MAL TV and ONA entries. Configure `MAL_CLIENT_ID` to include
+  MAL's continuing series; AniList's premiere catalog alone is not a complete
+  list of everything airing during the quarter.
+- Membership follows the source's selected season, not a show's status today.
+  Finished shows remain in historical feeds, and continuing shows have no
+  arbitrary start-year cutoff. Unknown start dates do not block Fribb mappings.
+  Cancelled AniList entries and non-series formats are excluded from the feed.
+- Sonarr imports TVDB **series**, so multiple anime seasons can collapse to one
+  `TvdbId`. Entries without a TVDB mapping cannot be exported. `TVDB_API_KEY`
+  enables conservative title/year lookup for missing mappings with known dates.
+  Explicit numbered-season suffixes are normalized for any season number and
+  searched without a year restriction, since TVDB may group them under an older
+  series. Matches must still have a unique exact normalized title or alias.
+  No title-specific overrides are maintained.
+- Sync covers the current and previous calendar years, current season first.
+  Each invocation advances one AniList page per target; repeat invocations
+  until pagination completes. MAL is fetched through all pages in one pass.
+  Completed targets refresh after 24 hours. Old rows are pruned only when their
+  replacement source pass completes; mapping-source failures leave the previous
+  feed intact.
+
+The self-hosted SQLite adapter exposes asynchronous D1 statement results while
+executing batch writes synchronously inside a single SQLite transaction.
 
 ## Setup
 
@@ -172,6 +226,11 @@ docker compose logs -f app
 | `bun run db:migrate:local` | Apply migrations to local D1 |
 | `bun run db:migrate:remote` | Apply migrations to production D1 |
 | `bun run db:studio` | Open Drizzle Studio |
+
+Tests cover observable behavior: season boundaries, pagination and complete
+refreshes, source-failure retention, mapping recovery, transaction rollback,
+request validation, and list isolation. Avoid snapshots of migration filenames,
+schema names, timestamps, response wording, or pass-through request options.
 
 The authored schema lives in `src/server/db/schema.ts`; generated SQL, snapshots,
 and the journal live together in the conventional root `drizzle/` directory.

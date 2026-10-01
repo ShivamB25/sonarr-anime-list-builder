@@ -24,7 +24,7 @@ class LocalD1PreparedStatement {
     return statement;
   }
 
-  all(): LocalD1Result {
+  async all(): Promise<LocalD1Result> {
     const results = this.db.query(this.sql).all(...this.params) as Record<
       string,
       unknown
@@ -32,11 +32,15 @@ class LocalD1PreparedStatement {
     return { results, success: true, meta: {} };
   }
 
-  raw(): unknown[][] {
+  async raw(): Promise<unknown[][]> {
     return this.db.query(this.sql).values(...this.params) as unknown[][];
   }
 
-  run(): LocalD1Result {
+  async run(): Promise<LocalD1Result> {
+    return this.execute();
+  }
+
+  execute(): LocalD1Result {
     this.db.query(this.sql).run(...this.params);
     return { results: [], success: true, meta: {} };
   }
@@ -59,7 +63,7 @@ export function createLocalD1Database(dbPath: string): LocalD1Database {
       const results: LocalD1Result[] = [];
       db.transaction(() => {
         for (const statement of statements) {
-          results.push(statement.run());
+          results.push(statement.execute());
         }
       })();
       return results;

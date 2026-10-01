@@ -5,7 +5,6 @@ export type MALAnime = {
   title: string;
   start_date?: string;
   media_type?: string;
-  status?: string;
 };
 
 export async function getAllMALSeasonalAnime(
@@ -19,7 +18,7 @@ export async function getAllMALSeasonalAnime(
   let offset = 0;
 
   while (true) {
-    const fields = "id,title,start_date,media_type,status";
+    const fields = "id,title,start_date,media_type";
     const url = `${MAL_URL}/anime/season/${year}/${normalizedSeason}?limit=${perPage}&offset=${offset}&fields=${fields}`;
     const res = await fetch(url, {
       headers: { "X-MAL-CLIENT-ID": clientId },

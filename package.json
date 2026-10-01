@@ -2,6 +2,7 @@
   "name": "sonarr-anime-list-builder",
   "version": "0.1.0",
   "private": true,
+  "license": "SEE LICENSE IN LICENSE",
   "description": "Build seasonal anime import lists and TVDB feeds for Sonarr using AniList and MyAnimeList metadata.",
   "keywords": [
     "sonarr",

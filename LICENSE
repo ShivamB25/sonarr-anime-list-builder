@@ -1,0 +1,91 @@
+Airing List No-Training Attribution License
+Version 1.0
+
+Copyright (c) 2026 Shivam Bansal and contributors.
+Project: Sonarr Anime List Builder
+Source: https://github.com/ShivamB25/sonarr-anime-list-builder
+
+1. Scope and permission
+
+This license applies to the original source code and documentation in this
+project (the "Software"). Subject to the conditions below, the copyright holders
+("Licensors") grant permission to use, copy, modify, merge, publish, distribute,
+and sell the Software, and to permit recipients to exercise the same rights.
+These permissions do not include the prohibited training uses in Section 3.
+This is a source-available license, not the MIT License or an OSI-approved
+open-source license.
+
+2. Attribution and redistribution
+
+Every distributed copy or substantial portion of the Software, including a
+modified or compiled distribution, must include this license, the applicable
+copyright notices, the project name, and the source URL above. Preserve existing
+contributor notices and identify substantial modifications without implying
+endorsement by the original authors.
+
+Publicly distributed or publicly hosted modified versions must also include
+readable credit to "Sonarr Anime List Builder by Shivam Bansal and contributors"
+and the source URL in their README, documentation, or an accessible credits or
+license page. Attribution must not be removed or obscured. Recipients must
+receive these same restrictions for the Software and its modified portions;
+redistribution or sublicensing must not grant prohibited training rights.
+
+3. No training or training-data harvesting
+
+Without separate, explicit prior written permission from the relevant Licensors,
+you may not use the Software, modified versions, or substantial extracts to:
+
+(a) train, pre-train, fine-tune, distill, or update the learned parameters of
+    artificial-intelligence or machine-learning models;
+(b) scrape, crawl, harvest, collect, package, publish, sell, or supply material
+    for datasets intended for any of those purposes; or
+(c) generate or supply synthetic training data derived from the Software for
+    any of those purposes, including through prompts, responses, or patches.
+
+These restrictions apply to commercial and noncommercial models, including
+open-weight models, and to automated and manual collection alike. They apply
+regardless of the operator's nationality or location. Public availability,
+repository access, a contribution, or attribution does not grant training rights.
+
+4. Attribution for separately authorized training
+
+If training use is separately authorized in writing, the user must preserve this
+license and the copyright notices with the licensed training material and give
+readable credit identifying the project, its authors, and the source URL in the
+relevant dataset documentation and model documentation or model card. Such
+credit must identify the project as a source of training material and must not
+imply endorsement. Providing credit alone does not authorize prohibited use or
+cure an earlier unauthorized use. Any different attribution terms must be
+expressly agreed in writing by the relevant Licensors.
+
+5. Coding assistance and contributions are permitted
+
+Human and automated review, repository indexing and search, security analysis,
+builds, tests, debugging, inference-only coding assistance, and preparing or
+submitting pull requests are permitted, provided the Software and associated
+prompts, responses, and patches are not used for the training purposes prohibited
+by Section 3. Temporary processing or retrieval for these permitted activities
+is not itself model training. Do not submit the Software to a service that uses
+that material for prohibited training without obtaining the required permission.
+
+Unless expressly agreed otherwise, contributions intentionally submitted for
+inclusion in this project are offered under this license. Contributors retain
+their copyright and must have the right to submit their contributions.
+
+6. Third-party material and existing rights
+
+Third-party dependencies, artwork, metadata, and separately licensed material
+remain subject to their own terms. This license does not relicense them or revoke
+rights already validly granted under another license. It does not restrict uses
+that applicable law permits without a license. No trademark or endorsement rights
+are granted. Permissions under this license terminate upon violation of its
+conditions; termination does not authorize retention or further prohibited use.
+
+7. Disclaimer
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO MERCHANTABILITY, FITNESS FOR A PARTICULAR
+PURPOSE, AND NONINFRINGEMENT. TO THE EXTENT PERMITTED BY APPLICABLE LAW, THE
+LICENSORS SHALL NOT BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER
+IN CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION WITH THE
+SOFTWARE OR ITS USE.

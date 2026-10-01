@@ -1,4 +1,3 @@
-import { cached } from "./cache";
 
 const MAPPING_URL =
   "https://raw.githubusercontent.com/Fribb/anime-lists/master/anime-list-full.json";
@@ -16,9 +15,14 @@ export interface TvdbLookupCandidate {
 type MappingEntry = {
   anilist_id?: number;
   tvdb_id?: number;
-  themoviedb_id?: number;
   mal_id?: number;
 };
+
+type MappingIndexes = {
+  byAnilist: Map<number, MappingEntry>;
+  byMal: Map<number, MappingEntry>;
+};
+
 
 interface TvdbLoginResponse {
   data?: { token?: string };
@@ -39,17 +43,11 @@ let byMal: Map<number, MappingEntry> | null = null;
 let cacheTimestamp = 0;
 let tvdbToken: string | null = null;
 let tvdbTokenTimestamp = 0;
-let mappingRequest: Promise<{
-  byAnilist: Map<number, MappingEntry>;
-  byMal: Map<number, MappingEntry>;
-}> | null = null;
+let mappingRequest: Promise<MappingIndexes> | null = null;
 let tvdbTokenApiKey: string | null = null;
 const tvdbTokenRequests = new Map<string, Promise<string>>();
 
-async function loadMappings(): Promise<{
-  byAnilist: Map<number, MappingEntry>;
-  byMal: Map<number, MappingEntry>;
-}> {
+async function loadMappings(): Promise<MappingIndexes> {
   if (byAnilist && byMal && Date.now() - cacheTimestamp < CACHE_TTL) {
     return { byAnilist, byMal };
   }
@@ -114,9 +112,11 @@ async function getTvdbToken(apiKey: string): Promise<string> {
   }
 }
 
+const SEASON_SUFFIX = /\s+(?:\d+(?:st|nd|rd|th)\s+season|season\s+\d+|s\d+)\s*$/i;
+
 function normalizeTitle(title: string): string {
   return title
-    .replace(/(?:\s+2nd\s+season|\s+season\s+2|\s+s2)$/i, "")
+    .replace(SEASON_SUFFIX, "")
     .normalize("NFKD")
     .replace(/[^a-z0-9]+/gi, "")
     .toLowerCase();
@@ -127,11 +127,13 @@ async function findTvdbSeriesId(
   apiKey: string
 ): Promise<number | null> {
   const token = await getTvdbToken(apiKey);
-  const baseTitle = candidate.title.split(":", 1)[0]?.trim() || candidate.title;
+  const seriesTitle = candidate.title.replace(SEASON_SUFFIX, "");
+  const baseTitle = seriesTitle.split(":", 1)[0]?.trim() || seriesTitle;
   const url = new URL(`${TVDB_API_URL}/search`);
   url.searchParams.set("query", baseTitle);
   url.searchParams.set("type", "series");
-  url.searchParams.set("year", String(candidate.year));
+  // Numbered anime seasons can belong to a TVDB series that premiered years earlier.
+  if (seriesTitle === candidate.title) url.searchParams.set("year", String(candidate.year));
 
   const response = await fetch(url, {
     headers: { authorization: `Bearer ${token}` },
@@ -159,31 +161,29 @@ async function resolveMissingTvdbIds(
   if (!apiKey) return;
   for (const candidate of candidates) {
     if (result.has(candidate.id)) continue;
-    try {
-      const tvdbId = await findTvdbSeriesId(candidate, apiKey);
-      if (tvdbId) result.set(candidate.id, tvdbId);
-    } catch {
-      // Fribb mappings remain available when TVDB is unavailable.
-    }
+    const tvdbId = await findTvdbSeriesId(candidate, apiKey);
+    if (tvdbId) result.set(candidate.id, tvdbId);
   }
 }
 
-export async function getIdsFromAnilist(
-  anilistId: number
-): Promise<{ tvdbId: number | null; tmdbId: number | null; malId: number | null }> {
-  return cached(`mapping:${anilistId}`, 21600, async () => {
-    try {
-      const { byAnilist } = await loadMappings();
-      const entry = byAnilist.get(anilistId);
-      return {
-        tvdbId: entry?.tvdb_id ?? null,
-        tmdbId: entry?.themoviedb_id ?? null,
-        malId: entry?.mal_id ?? null,
-      };
-    } catch {
-      return { tvdbId: null, tmdbId: null, malId: null };
-    }
-  });
+
+async function batchGetTvdbIdsFromMappings(
+  ids: number[],
+  index: "byAnilist" | "byMal",
+  candidates: TvdbLookupCandidate[],
+  tvdbApiKey?: string
+): Promise<Map<number, number>> {
+  if (ids.length === 0 && candidates.length === 0) return new Map();
+
+  const mappings = await loadMappings();
+  const result = new Map<number, number>();
+  for (const id of ids) {
+    const entry = mappings[index].get(id);
+    if (entry?.tvdb_id) result.set(id, entry.tvdb_id);
+  }
+
+  await resolveMissingTvdbIds(result, candidates, tvdbApiKey);
+  return result;
 }
 
 export async function batchGetTvdbIds(
@@ -191,19 +191,7 @@ export async function batchGetTvdbIds(
   candidates: TvdbLookupCandidate[] = [],
   tvdbApiKey?: string
 ): Promise<Map<number, number>> {
-  const result = new Map<number, number>();
-  try {
-    const { byAnilist } = await loadMappings();
-    for (const id of anilistIds) {
-      const entry = byAnilist.get(id);
-      if (entry?.tvdb_id) result.set(id, entry.tvdb_id);
-    }
-  } catch {
-    // Continue with the optional TVDB fallback.
-  }
-
-  await resolveMissingTvdbIds(result, candidates, tvdbApiKey);
-  return result;
+  return batchGetTvdbIdsFromMappings(anilistIds, "byAnilist", candidates, tvdbApiKey);
 }
 
 export async function batchGetTvdbIdsFromMal(
@@ -211,17 +199,5 @@ export async function batchGetTvdbIdsFromMal(
   candidates: TvdbLookupCandidate[] = [],
   tvdbApiKey?: string
 ): Promise<Map<number, number>> {
-  const result = new Map<number, number>();
-  try {
-    const { byMal } = await loadMappings();
-    for (const id of malIds) {
-      const entry = byMal.get(id);
-      if (entry?.tvdb_id) result.set(id, entry.tvdb_id);
-    }
-  } catch {
-    // Continue with the optional TVDB fallback.
-  }
-
-  await resolveMissingTvdbIds(result, candidates, tvdbApiKey);
-  return result;
+  return batchGetTvdbIdsFromMappings(malIds, "byMal", candidates, tvdbApiKey);
 }

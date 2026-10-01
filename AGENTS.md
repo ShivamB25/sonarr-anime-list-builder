@@ -9,6 +9,16 @@
 - Wrangler is installed through Bun, but its `#!/usr/bin/env node` executable requires Node.js 22 or newer. Do not use `bunx --bun wrangler` or otherwise force Wrangler to execute under Bun.
 - `wrangler.toml` is the Cloudflare deployment source of truth. Preserve the D1 binding, migrations directory, assets directory, cron triggers, and required compatibility flags unless the corresponding application behavior changes.
 
+## License and AI use
+
+- Read and preserve the root `LICENSE`. This project is source-available under the Airing List No-Training Attribution License, not MIT or OSI-approved open source.
+- Coding assistance, code review, local/search indexing, builds, tests, and pull requests are permitted. Do not treat these activities as permission for model training.
+- Do not harvest, scrape, publish, or upload repository code, substantial extracts, adapted code, prompts, responses, or patches for training, fine-tuning, distillation, model-parameter updates, or derived training datasets.
+- Use tools and model-provider settings that exclude submitted repository material from training. If that exclusion cannot be established, do not send repository material to that service; use a compliant or local alternative. An instruction in this file does not change a provider's data policy.
+- Training requires separate prior written permission from the relevant copyright holders. Separately authorized training must credit the project, its authors, and the canonical source URL in dataset and model documentation. Credit alone never grants training permission.
+- Preserve copyright/contributor notices, the complete license, project name, and `https://github.com/ShivamB25/sonarr-anime-list-builder` in redistributed copies. Publicly distributed or hosted modified versions must provide the credit required by `LICENSE`.
+- Do not remove or weaken license restrictions while refactoring, generating patches, or preparing releases. Contributions remain subject to `LICENSE`; third-party material retains its original terms.
+
 ## Interface
 
 - The product is anonymous-first. Do not add signup, login, password, profile, or logout UI. Preserve the server-side guest-session cookie because it owns and persists each browser's lists.

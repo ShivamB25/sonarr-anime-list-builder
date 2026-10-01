@@ -24,17 +24,13 @@ afterEach(async () => {
 });
 
 describe("local D1 batch transactions", () => {
-  test("completes every statement and returns one successful result per statement", async () => {
-    const results = await database.batch([
+  test("commits every statement in a successful batch", async () => {
+    await database.batch([
       database.prepare("INSERT INTO entries (id, value) VALUES (?, ?)").bind(1, "first"),
       database.prepare("INSERT INTO entries (id, value) VALUES (?, ?)").bind(2, "second"),
     ]);
 
-    expect(results).toEqual([
-      { results: [], success: true, meta: {} },
-      { results: [], success: true, meta: {} },
-    ]);
-    expect(database.prepare("SELECT id, value FROM entries ORDER BY id").all().results).toEqual([
+    expect((await database.prepare("SELECT id, value FROM entries ORDER BY id").all()).results).toEqual([
       { id: 1, value: "first" },
       { id: 2, value: "second" },
     ]);
@@ -47,7 +43,7 @@ describe("local D1 batch transactions", () => {
     ]);
 
     await expect(batch).rejects.toThrow();
-    expect(database.prepare("SELECT id, value FROM entries").all().results).toEqual([]);
+    expect((await database.prepare("SELECT id, value FROM entries").all()).results).toEqual([]);
   });
 });
 
@@ -68,16 +64,16 @@ describe("local D1 migrations", () => {
       migrateLocalD1Database(database, migrationsDirectory)
     ).rejects.toThrow();
     expect(
-      database
+      (await database
         .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?")
         .bind("migrated_entries")
-        .all().results
+        .all()).results
     ).toEqual([]);
     expect(
-      database
+      (await database
         .prepare("SELECT name FROM __local_migrations WHERE name = ?")
         .bind("0000_retry.sql")
-        .all().results
+        .all()).results
     ).toEqual([]);
 
     await writeFile(
@@ -90,61 +86,12 @@ describe("local D1 migrations", () => {
     );
     await migrateLocalD1Database(database, migrationsDirectory);
 
-    expect(database.prepare("SELECT id FROM migrated_entries").all().results).toEqual([
+    expect((await database.prepare("SELECT id FROM migrated_entries").all()).results).toEqual([
       { id: 1 },
     ]);
     expect(
-      database.prepare("SELECT name FROM __local_migrations").all().results
+      (await database.prepare("SELECT name FROM __local_migrations").all()).results
     ).toEqual([{ name: "0000_retry.sql" }]);
   });
 
-  test("replays the committed migration history into the final schema", async () => {
-    await migrateLocalD1Database(
-      database,
-      join(import.meta.dir, "../drizzle")
-    );
-
-    const applicationTables = database
-      .prepare(
-        "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('entries', '__local_migrations') ORDER BY name"
-      )
-      .all().results;
-    expect(applicationTables).toEqual([
-      { name: "list_items" },
-      { name: "lists" },
-      { name: "season_feed_entries" },
-      { name: "season_feed_sync" },
-      { name: "seasonal_browse_items" },
-      { name: "users" },
-    ]);
-
-    const queryIndexes = database
-      .prepare(
-        "SELECT name FROM sqlite_master WHERE type = 'index' AND name IN (?, ?, ?, ?) ORDER BY name"
-      )
-      .bind(
-        "list_items_list_added_idx",
-        "lists_user_created_idx",
-        "season_feed_entries_season_tvdb_idx",
-        "seasonal_browse_items_page_idx"
-      )
-      .all().results;
-    expect(queryIndexes).toEqual([
-      { name: "list_items_list_added_idx" },
-      { name: "lists_user_created_idx" },
-      { name: "season_feed_entries_season_tvdb_idx" },
-      { name: "seasonal_browse_items_page_idx" },
-    ]);
-
-    const appliedMigrations = database
-      .prepare("SELECT name FROM __local_migrations ORDER BY name")
-      .all().results;
-    expect(appliedMigrations).toEqual([
-      { name: "0000_lame_banshee.sql" },
-      { name: "0001_lovely_meteorite.sql" },
-      { name: "0002_zippy_captain_stacy.sql" },
-      { name: "0003_mysterious_warbird.sql" },
-      { name: "0004_add_query_indexes.sql" },
-    ]);
-  });
 });

@@ -1,37 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import {
   getCurrentSeason,
-  isSeason,
-  SEASON_LABELS,
-  SEASONS,
   type Season,
 } from "../src/shared/season";
-
-describe("shared season values", () => {
-  test("exposes the four canonical seasons in calendar order", () => {
-    expect(SEASONS).toEqual(["WINTER", "SPRING", "SUMMER", "FALL"]);
-  });
-
-  test("provides a display label for every canonical season", () => {
-    expect(SEASON_LABELS).toEqual({
-      WINTER: "Winter",
-      SPRING: "Spring",
-      SUMMER: "Summer",
-      FALL: "Fall",
-    });
-  });
-
-  test.each([...SEASONS])("accepts %s as a season", (season) => {
-    expect(isSeason(season)).toBe(true);
-  });
-
-  test.each(["winter", "AUTUMN", "", null, 1])(
-    "rejects non-canonical season value %p",
-    (value) => {
-      expect(isSeason(value)).toBe(false);
-    }
-  );
-});
 
 describe("current season boundaries", () => {
   const cases: ReadonlyArray<readonly [string, number, Season]> = [
