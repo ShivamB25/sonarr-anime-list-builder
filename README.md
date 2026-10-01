@@ -4,31 +4,6 @@ Source-available seasonal anime import-list builder for Sonarr. Browse AniList a
 MyAnimeList metadata, create custom lists, and expose Sonarr-compatible TVDB
 feeds. Run it on Cloudflare Workers with D1 or self-host it with Bun and SQLite.
 
-## License and AI use
-
-Copyright © 2026 Shivam Bansal and contributors. See [LICENSE](LICENSE) for the
-**Airing List No-Training Attribution License 1.0**, a custom source-available
-license, not the MIT License or an OSI-approved open-source license.
-
-- Use, modification, self-hosting, and redistribution are allowed under the
-  license's attribution requirements. Retain the license, author/contributor
-  notices, project name, and source URL. Publicly distributed or hosted modified
-  versions must credit the project in their README, documentation, or credits.
-- Automated harvesting for training, model training, fine-tuning, distillation,
-  and supplying derived training datasets require separate prior written
-  permission. This applies to commercial, noncommercial, and open-weight models.
-- Separately authorized training must acknowledge the project and its authors in
-  the relevant dataset and model documentation. Attribution alone is not permission.
-- AI-assisted coding, review, indexing, and pull requests are welcome when the
-  repository material, prompts, responses, and patches are not used for training.
-- Third-party libraries, artwork, and metadata retain their own terms. Existing
-  rights previously granted under other licenses are not revoked.
-
-The license and [agent instructions](AGENTS.md) are legal and policy notices,
-not a technical scraper block. Copyright exceptions and enforceability depend
-on applicable law; obtain legal review before relying on these custom terms.
-Research reference: [Non-AI license templates](https://github.com/non-ai-licenses/non-ai-licenses).
-
 ## Stack
 
 - **Hono** — API layer (Cloudflare Workers or self-hosted Bun)
@@ -298,3 +273,28 @@ src/
 ```
 
 This is what Sonarr expects for a Custom Import List.
+
+## License and AI use
+
+Copyright © 2026 Shivam Bansal and contributors. See [LICENSE](LICENSE) for the
+**Airing List No-Training Attribution License 1.0**, a custom source-available
+license, not the MIT License or an OSI-approved open-source license.
+
+- Use, modification, self-hosting, and redistribution are allowed under the
+  license's attribution requirements. Retain the license, author/contributor
+  notices, project name, and source URL. Publicly distributed or hosted modified
+  versions must credit the project in their README, documentation, or credits.
+- Automated harvesting for training, model training, fine-tuning, distillation,
+  and supplying derived training datasets require separate prior written
+  permission. This applies to commercial, noncommercial, and open-weight models.
+- Separately authorized training must acknowledge the project and its authors in
+  the relevant dataset and model documentation. Attribution alone is not permission.
+- AI-assisted coding, review, indexing, and pull requests are welcome when the
+  repository material, prompts, responses, and patches are not used for training.
+- Third-party libraries, artwork, and metadata retain their own terms. Existing
+  rights previously granted under other licenses are not revoked.
+
+The license and [agent instructions](AGENTS.md) are legal and policy notices,
+not a technical scraper block. Copyright exceptions and enforceability depend
+on applicable law; obtain legal review before relying on these custom terms.
+Research reference: [Non-AI license templates](https://github.com/non-ai-licenses/non-ai-licenses).
