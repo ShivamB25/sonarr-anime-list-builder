@@ -36,10 +36,12 @@ Before committing runtime, dependency, deployment, or build changes, run:
 bun install --frozen-lockfile
 bun run db:check
 bun run typecheck
-bun test
+bun run test
 bun run build:client
 bunx wrangler deploy --dry-run
 ```
+
+Use `bun run test` and `bun run test:watch`, which enable per-file isolation. Bare `bun test` shares module caches between files and can leak mocked upstream data across suites.
 
 For Docker changes, also build the image and smoke-test both `/api/health` and `/` from the resulting container.
 
