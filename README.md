@@ -191,7 +191,7 @@ docker compose logs -f app
 | `bun run dev:local` | Start the Bun server with local SQLite |
 | `bun run dev:client` | Watch and rebuild the React client |
 | `bun run typecheck` | Type-check the browser, Worker, Bun/tooling, and tests |
-| `bun test` | Run the Bun test suite |
+| `bun run test` | Run the Bun test suite with per-file isolation |
 | `bun run build:client` | Build the React client |
 | `bunx wrangler deploy --dry-run` | Build the Worker without deploying |
 | `bun run build` | Run all validation and both production builds |
@@ -207,6 +207,10 @@ refreshes, source-failure retention, mapping recovery, transaction rollback,
 request validation, and list isolation. Avoid snapshots of migration filenames,
 schema names, timestamps, response wording, or pass-through request options.
 
+Use `bun run test` or `bun run test:watch`, rather than bare `bun test`.
+Both scripts enable Bun's `--isolate` mode so each file gets fresh globals and
+module caches; mocked upstream data and fake clocks cannot leak between files.
+
 The authored schema lives in `src/server/db/schema.ts`; generated SQL, snapshots,
 and the journal live together in the conventional root `drizzle/` directory.
 Commit those generated artifacts together and never edit a migration that has
@@ -217,7 +221,7 @@ Run each validation step independently:
 ```bash
 bun run db:check
 bun run typecheck
-bun test
+bun run test
 bun run build:client
 bunx wrangler deploy --dry-run
 ```
