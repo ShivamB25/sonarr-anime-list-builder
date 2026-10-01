@@ -203,7 +203,7 @@ describe("seasonal Sonarr membership", () => {
           MAL_CLIENT_ID: "test-client",
           ADMIN_SYNC_TOKEN: "",
         };
-        await runSync(env.DB, env.MAL_CLIENT_ID, undefined, true);
+        await runSync(env.DB, env.MAL_CLIENT_ID);
         const response = await app.request(
           `/api/anime/season-feed?season=${targetSeason}&year=${targetYear}`, undefined, env
         );
@@ -214,7 +214,8 @@ describe("seasonal Sonarr membership", () => {
 
         mappingUnavailable = true;
         setSystemTime(new Date(`${targetYear}-11-02T00:00:01Z`));
-        await expect(runSync(env.DB, env.MAL_CLIENT_ID, undefined, true)).rejects.toThrow();
+        const failedSync = await runSync(env.DB, env.MAL_CLIENT_ID);
+        expect(failedSync.completed).toBe(false);
         const retained = (await database.prepare(
           "SELECT DISTINCT tvdb_id FROM season_feed_entries WHERE season = ? AND year = ? ORDER BY tvdb_id"
         ).bind(targetSeason, targetYear).all()).results;

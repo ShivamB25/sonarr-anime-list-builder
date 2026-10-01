@@ -35,6 +35,8 @@ there is no account UI or cross-device account sync.
   Finished shows remain in historical feeds, and continuing shows have no
   arbitrary start-year cutoff. Unknown start dates do not block Fribb mappings.
   Cancelled AniList entries and non-series formats are excluded from the feed.
+  MAL requests include gray-rated titles, which its default API filter hides;
+  black-rated titles remain excluded.
 - Sonarr imports TVDB **series**, so multiple anime seasons can collapse to one
   `TvdbId`. Entries without a TVDB mapping cannot be exported. `TVDB_API_KEY`
   enables conservative title/year lookup for missing mappings with known dates.
@@ -48,6 +50,15 @@ there is no account UI or cross-device account sync.
   Completed targets refresh after 24 hours. Old rows are pruned only when their
   replacement source pass completes; mapping-source failures leave the previous
   feed intact.
+- Provider failures do not stop the other sources from syncing. The authenticated
+  `POST /api/admin/run-sync` returns HTTP 502 with `ok: false` and per-season,
+  per-source errors when any source fails; successful runs return HTTP 200.
+  Scheduled sync failures are also propagated to Cloudflare instead of silently
+  appearing successful.
+- An upstream access block can leave AniList's browse catalog stale while MAL
+  continues updating the Sonarr feed. AniList's error message is retained in sync
+  diagnostics. Resolve access restrictions with the provider; successful MAL
+  updates do not mean AniList has refreshed.
 
 The self-hosted SQLite adapter exposes asynchronous D1 statement results while
 executing batch writes synchronously inside a single SQLite transaction.

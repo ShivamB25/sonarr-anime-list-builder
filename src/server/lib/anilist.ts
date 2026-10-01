@@ -97,7 +97,17 @@ async function gqlRequest(query: string, variables: Record<string, unknown>) {
       continue;
     }
 
-    if (!res.ok) throw new Error(`AniList API error: ${res.status}`);
+    if (!res.ok) {
+      const body: unknown = await res.json().catch(() => null);
+      const messages = body && typeof body === "object" && "errors" in body &&
+        Array.isArray(body.errors)
+        ? body.errors.flatMap((error: unknown) =>
+          error && typeof error === "object" && "message" in error &&
+          typeof error.message === "string" ? [error.message] : []
+        )
+        : [];
+      throw new Error(`AniList API error: ${res.status}${messages.length ? `: ${messages.join("; ")}` : ""}`);
+    }
     const json = (await res.json()) as { data: { Page: { pageInfo: { hasNextPage: boolean; currentPage: number; lastPage: number; total: number }; media: AniListMedia[] } } };
     return json.data.Page;
   }
