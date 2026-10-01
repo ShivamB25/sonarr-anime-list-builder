@@ -28,8 +28,8 @@ app.post("/api/admin/run-sync", async (c) => {
   }
 
   try {
-    const result = await runSync(c.env.DB, c.env.MAL_CLIENT_ID, c.env.TVDB_API_KEY, true);
-    return c.json({ ok: true, result });
+    const result = await runSync(c.env.DB, c.env.MAL_CLIENT_ID, c.env.TVDB_API_KEY);
+    return c.json({ ok: result.completed, result }, result.completed ? 200 : 502);
   } catch {
     return c.json({ ok: false, error: "Internal server error" }, 500);
   }
@@ -47,7 +47,13 @@ export default {
     env: AppBindings,
     ctx: ExecutionContext
   ) => {
-    ctx.waitUntil(runSync(env.DB, env.MAL_CLIENT_ID, env.TVDB_API_KEY));
+    ctx.waitUntil(runSync(env.DB, env.MAL_CLIENT_ID, env.TVDB_API_KEY).then((result) => {
+      if (!result.completed) {
+        throw new Error(result.errors.map((error) =>
+          `[${error.source}] ${error.season} ${error.year}: ${error.message}`
+        ).join("\n"));
+      }
+    }));
   },
 } satisfies ExportedHandler<AppBindings>;
 

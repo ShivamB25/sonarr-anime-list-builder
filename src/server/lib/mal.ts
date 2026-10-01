@@ -5,6 +5,7 @@ export type MALAnime = {
   title: string;
   start_date?: string;
   media_type?: string;
+  nsfw?: "white" | "gray" | "black";
 };
 
 export async function getAllMALSeasonalAnime(
@@ -18,8 +19,8 @@ export async function getAllMALSeasonalAnime(
   let offset = 0;
 
   while (true) {
-    const fields = "id,title,start_date,media_type";
-    const url = `${MAL_URL}/anime/season/${year}/${normalizedSeason}?limit=${perPage}&offset=${offset}&fields=${fields}`;
+    const fields = "id,title,start_date,media_type,nsfw";
+    const url = `${MAL_URL}/anime/season/${year}/${normalizedSeason}?limit=${perPage}&offset=${offset}&fields=${fields}&nsfw=true`;
     const res = await fetch(url, {
       headers: { "X-MAL-CLIENT-ID": clientId },
     });

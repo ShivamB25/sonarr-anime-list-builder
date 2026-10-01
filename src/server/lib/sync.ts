@@ -279,7 +279,7 @@ async function syncMAL(
   const syncRunAt = Date.now();
   const malMedia = await getAllMALSeasonalAnime(season, year, malClientId);
   const eligibleMedia = malMedia.filter((media) =>
-    media.media_type === "tv" || media.media_type === "ona"
+    (media.media_type === "tv" || media.media_type === "ona") && media.nsfw !== "black"
   );
   const malIds = eligibleMedia.map((media) => media.id);
   const tvdbMap = await batchGetTvdbIdsFromMal(
@@ -324,8 +324,7 @@ export type SyncResult = {
 export async function runSync(
   d1: D1Database,
   malClientId: string,
-  tvdbApiKey?: string,
-  failFast = false
+  tvdbApiKey?: string
 ): Promise<SyncResult> {
   const db = drizzle(d1);
   const targets = getSeasonTargets();
@@ -341,11 +340,6 @@ export async function runSync(
         source: "anilist" as const,
         message: error instanceof Error ? error.message : String(error),
       };
-      if (failFast) {
-        throw new Error(
-          `[${syncError.source}] ${syncError.season} ${syncError.year}: ${syncError.message}`
-        );
-      }
       errors.push(syncError);
     }
 
@@ -359,11 +353,6 @@ export async function runSync(
           source: "mal" as const,
           message: error instanceof Error ? error.message : String(error),
         };
-        if (failFast) {
-          throw new Error(
-            `[${syncError.source}] ${syncError.season} ${syncError.year}: ${syncError.message}`
-          );
-        }
         errors.push(syncError);
       }
     }
