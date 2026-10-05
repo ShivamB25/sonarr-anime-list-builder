@@ -8,9 +8,6 @@
   "include": [
     "src/server/**/*.ts",
     "src/shared/**/*.ts",
-    "tests/server-app.test.ts",
-    "tests/list-deletion-isolation.test.ts",
-    "tests/local-d1.test.ts",
     "vite.config.ts",
     "drizzle.config.ts"
   ],

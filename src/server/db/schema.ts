@@ -82,7 +82,7 @@ export const seasonFeedEntries = sqliteTable(
   ]
 );
 
-// Tracks incremental sync state per (season, year, source)
+// Tracks source refresh completion and the most recent attempt per season
 export const seasonFeedSync = sqliteTable(
   "season_feed_sync",
   {
@@ -91,7 +91,7 @@ export const seasonFeedSync = sqliteTable(
     source: text("source").notNull(), // "anilist" | "mal"
     nextPage: integer("next_page").notNull().default(1),
     done: integer("done").notNull().default(0), // 0 = pending, 1 = done
-    lastSyncedAt: integer("last_synced_at"),
+    lastSyncedAt: integer("last_synced_at"), // Last attempt; done distinguishes successful refreshes
   },
   (t) => [primaryKey({ columns: [t.season, t.year, t.source] })]
 );

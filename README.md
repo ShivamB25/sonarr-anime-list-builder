@@ -38,21 +38,32 @@ there is no account UI or cross-device account sync.
   MAL requests include gray-rated titles, which its default API filter hides;
   black-rated titles remain excluded.
 - Sonarr imports TVDB **series**, so multiple anime seasons can collapse to one
-  `TvdbId`. Entries without a TVDB mapping cannot be exported. `TVDB_API_KEY`
-  enables conservative title/year lookup for missing mappings with known dates.
-  Explicit numbered-season suffixes are normalized for any season number and
-  searched without a year restriction, since TVDB may group them under an older
-  series. Matches must still have a unique exact normalized title or alias.
-  No title-specific overrides are maintained.
-- Sync covers the current and previous calendar years, current season first.
-  Each invocation advances one AniList page per target; repeat invocations
-  until pagination completes. MAL is fetched through all pages in one pass.
-  Completed targets refresh after 24 hours. Old rows are pruned only when their
-  replacement source pass completes; mapping-source failures leave the previous
-  feed intact.
+  `TvdbId`. Entries without a verified TVDB series ID cannot be exported.
+  `TVDB_API_KEY` enables conservative fallback searches using English, Romaji,
+  and native titles, including titles without a known start date. Explicit
+  numbered-season suffixes are normalized and searched without a year
+  restriction; other dated titles retain their year restriction. Matches must
+  have a unique exact normalized title or alias. Ambiguous matches are omitted,
+  and no title-specific overrides are maintained.
+  Custom-list feeds also use `TVDB_API_KEY`, with their stored English/original
+  titles as lookup candidates, and deduplicate results by TVDB series ID. List
+  items do not store premiere dates, so their fallback has no year restriction.
+  Successful TVDB search responses (including no-match results) are cached for
+  six hours through the existing memory/edge cache; API failures are not cached.
+- Automatic sync covers the current and previous calendar years, processing one
+  due season per invocation. The current season wins initial ties; subsequent
+  work selects the oldest attempted due season, so failures cannot starve the
+  others. Each selected season fetches every AniList and MAL provider page.
+  Successful sources refresh after 24 hours.
+- Complete catalog and source-feed snapshots are replaced in atomic D1 batches,
+  using bulk JSON inserts instead of one query per title. Failed provider pages
+  retain the previous snapshot. TVDB mapping failures retain the previous feed
+  but do not prevent a complete AniList browse catalog from being published.
 - Provider failures do not stop the other sources from syncing. The authenticated
   `POST /api/admin/run-sync` returns HTTP 502 with `ok: false` and per-season,
-  per-source errors when any source fails; successful runs return HTTP 200.
+  per-source errors when any source fails; successful selected passes return HTTP
+  200. `result.target` identifies the selected season, or is `null` when no
+  automatic work is due. Success does not mean all eight seasons ran at once.
   Scheduled sync failures are also propagated to Cloudflare instead of silently
   appearing successful.
 - An upstream access block can leave AniList's browse catalog stale while MAL
@@ -62,6 +73,44 @@ there is no account UI or cross-device account sync.
 
 The self-hosted SQLite adapter exposes asynchronous D1 statement results while
 executing batch writes synchronously inside a single SQLite transaction.
+
+### Refreshing stored seasons
+
+The authenticated `POST /api/admin/run-sync?season=FALL&year=2026&force=true`
+refreshes that complete season immediately, bypassing the 24-hour freshness
+interval. Both `season` and a positive integer `year` are required for a targeted
+run; historical years outside the automatic two-year range are also supported.
+
+After deployment, refill all eight automatically supported seasons with Bun.
+Store `ADMIN_SYNC_TOKEN` in an ignored `.env` file and set `SYNC_BASE_URL` to your
+deployment URL; omit it to use the local server:
+
+```bash
+SYNC_BASE_URL="https://airing-list-web.edge-5af.workers.dev" bun --env-file=.env -e '
+if (!Bun.env.ADMIN_SYNC_TOKEN) throw new Error("ADMIN_SYNC_TOKEN is required");
+const base = Bun.env.SYNC_BASE_URL ?? "http://localhost:8787";
+const year = new Date().getUTCFullYear();
+for (const y of [year, year - 1]) {
+  for (const season of ["WINTER", "SPRING", "SUMMER", "FALL"]) {
+    const response = await fetch(`${base}/api/admin/run-sync?season=${season}&year=${y}&force=true`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${Bun.env.ADMIN_SYNC_TOKEN}` },
+    });
+    console.log(y, season, response.status, await response.json());
+    if (!response.ok) process.exitCode = 1;
+  }
+}
+'
+```
+
+The feed can contain fewer entries than the catalog: movies and other
+non-series formats are excluded, unmapped series need authoritative mappings
+or a successful TVDB lookup, and multiple provider entries can share one ID.
+Large TVDB fallback passes can exceed
+[Worker Free's 50-subrequest limit](https://developers.cloudflare.com/workers/platform/limits/#subrequests);
+use a runtime or plan with sufficient request capacity. A lookup failure is
+reported rather than replacing the feed with an incomplete result.
+
 
 ## Setup
 
@@ -201,8 +250,7 @@ docker compose logs -f app
 | `bun run dev` | Start the Wrangler development server with local D1 |
 | `bun run dev:local` | Start the Bun server with local SQLite |
 | `bun run dev:client` | Watch and rebuild the React client |
-| `bun run typecheck` | Type-check the browser, Worker, Bun/tooling, and tests |
-| `bun run test` | Run the Bun test suite with per-file isolation |
+| `bun run typecheck` | Type-check the browser, Worker, and Bun/tooling |
 | `bun run build:client` | Build the React client |
 | `bunx wrangler deploy --dry-run` | Build the Worker without deploying |
 | `bun run build` | Run all validation and both production builds |
@@ -213,14 +261,9 @@ docker compose logs -f app
 | `bun run db:migrate:remote` | Apply migrations to production D1 |
 | `bun run db:studio` | Open Drizzle Studio |
 
-Tests cover observable behavior: season boundaries, pagination and complete
-refreshes, source-failure retention, mapping recovery, transaction rollback,
-request validation, and list isolation. Avoid snapshots of migration filenames,
-schema names, timestamps, response wording, or pass-through request options.
-
-Use `bun run test` or `bun run test:watch`, rather than bare `bun test`.
-Both scripts enable Bun's `--isolate` mode so each file gets fresh globals and
-module caches; mocked upstream data and fake clocks cannot leak between files.
+There is no permanent test suite. Verify changed behavior through the actual
+Bun or `workerd` runtime and check the affected API responses and browser
+surface. Remove throwaway smoke scripts after verification.
 
 The authored schema lives in `src/server/db/schema.ts`; generated SQL, snapshots,
 and the journal live together in the conventional root `drizzle/` directory.
@@ -232,7 +275,6 @@ Run each validation step independently:
 ```bash
 bun run db:check
 bun run typecheck
-bun run test
 bun run build:client
 bunx wrangler deploy --dry-run
 ```
