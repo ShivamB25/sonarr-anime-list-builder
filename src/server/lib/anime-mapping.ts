@@ -1,4 +1,4 @@
-
+import { cached } from "./cache";
 const MAPPING_URL =
   "https://raw.githubusercontent.com/Fribb/anime-lists/master/anime-list-full.json";
 const TVDB_API_URL = "https://api4.thetvdb.com/v4";
@@ -9,7 +9,8 @@ const TVDB_TOKEN_TTL = 1000 * 60 * 60 * 24 * 29;
 export interface TvdbLookupCandidate {
   id: number;
   title: string;
-  year: number;
+  year?: number;
+  alternateTitles?: string[];
 }
 
 type MappingEntry = {
@@ -47,6 +48,44 @@ let mappingRequest: Promise<MappingIndexes> | null = null;
 let tvdbTokenApiKey: string | null = null;
 const tvdbTokenRequests = new Map<string, Promise<string>>();
 
+function isPositiveSafeInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
+}
+
+function isMappingEntry(value: unknown): value is MappingEntry {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function buildMappingIndex(
+  entries: MappingEntry[],
+  key: "anilist_id" | "mal_id"
+): Map<number, MappingEntry> {
+  const index = new Map<number, MappingEntry>();
+  const conflictingIds = new Set<number>();
+
+  for (const entry of entries) {
+    const id = entry[key];
+    const tvdbId = entry.tvdb_id;
+    if (
+      !isPositiveSafeInteger(id) ||
+      !isPositiveSafeInteger(tvdbId) ||
+      conflictingIds.has(id)
+    ) {
+      continue;
+    }
+
+    const existing = index.get(id);
+    if (!existing) {
+      index.set(id, { [key]: id, tvdb_id: tvdbId });
+    } else if (existing.tvdb_id !== tvdbId) {
+      index.delete(id);
+      conflictingIds.add(id);
+    }
+  }
+
+  return index;
+}
+
 async function loadMappings(): Promise<MappingIndexes> {
   if (byAnilist && byMal && Date.now() - cacheTimestamp < CACHE_TTL) {
     return { byAnilist, byMal };
@@ -56,14 +95,13 @@ async function loadMappings(): Promise<MappingIndexes> {
     mappingRequest = (async () => {
       const res = await fetch(MAPPING_URL);
       if (!res.ok) throw new Error(`Failed to fetch mapping: ${res.status}`);
-      const data = (await res.json()) as MappingEntry[];
-      const nextByAnilist = new Map<number, MappingEntry>();
-      const nextByMal = new Map<number, MappingEntry>();
-
-      for (const entry of data) {
-        if (entry.anilist_id) nextByAnilist.set(entry.anilist_id, entry);
-        if (entry.mal_id) nextByMal.set(entry.mal_id, entry);
+      const payload: unknown = await res.json();
+      if (!Array.isArray(payload)) {
+        throw new Error("Invalid mapping response: expected an array");
       }
+      const entries = (payload as unknown[]).filter(isMappingEntry);
+      const nextByAnilist = buildMappingIndex(entries, "anilist_id");
+      const nextByMal = buildMappingIndex(entries, "mal_id");
 
       byAnilist = nextByAnilist;
       byMal = nextByMal;
@@ -112,45 +150,88 @@ async function getTvdbToken(apiKey: string): Promise<string> {
   }
 }
 
-const SEASON_SUFFIX = /\s+(?:\d+(?:st|nd|rd|th)\s+season|season\s+\d+|s\d+)\s*$/i;
+const SEASON_SUFFIX =
+  /(?:\s+|[-:]\s*)(?:\d+(?:st|nd|rd|th)?\s+season|season\s+\d+|s\s*\d+)\s*$/i;
 
 function normalizeTitle(title: string): string {
   return title
     .replace(SEASON_SUFFIX, "")
     .normalize("NFKD")
-    .replace(/[^a-z0-9]+/gi, "")
-    .toLowerCase();
+    .replace(/(\p{Script=Latin})\p{M}+/gu, "$1")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{M}\p{N}]+/gu, "");
 }
 
 async function findTvdbSeriesId(
   candidate: TvdbLookupCandidate,
   apiKey: string
 ): Promise<number | null> {
-  const token = await getTvdbToken(apiKey);
-  const seriesTitle = candidate.title.replace(SEASON_SUFFIX, "");
-  const baseTitle = seriesTitle.split(":", 1)[0]?.trim() || seriesTitle;
-  const url = new URL(`${TVDB_API_URL}/search`);
-  url.searchParams.set("query", baseTitle);
-  url.searchParams.set("type", "series");
-  // Numbered anime seasons can belong to a TVDB series that premiered years earlier.
-  if (seriesTitle === candidate.title) url.searchParams.set("year", String(candidate.year));
-
-  const response = await fetch(url, {
-    headers: { authorization: `Bearer ${token}` },
-  });
-  if (!response.ok) throw new Error(`TVDB search failed: ${response.status}`);
-
-  const data = (await response.json()) as TvdbSearchResponse;
-  const expectedTitle = normalizeTitle(candidate.title);
-  const matches = (data.data ?? []).filter((result) =>
-    [result.name, ...(result.aliases ?? [])].some(
-      (title) => title && normalizeTitle(title) === expectedTitle
-    )
+  const titles = [candidate.title, ...(candidate.alternateTitles ?? [])].filter(
+    (title): title is string => typeof title === "string"
   );
-  if (matches.length !== 1) return null;
+  const expectedTitles = new Set(
+    titles.map(normalizeTitle).filter((title) => title.length > 0)
+  );
+  if (expectedTitles.size === 0) return null;
 
-  const match = /^series-(\d+)$/.exec(matches[0]?.objectID ?? "");
-  return match ? Number(match[1]) : null;
+  const searchQueries = new Map<
+    string,
+    { query: string; seasonQualified: boolean }
+  >();
+  for (const title of titles) {
+    const query = title.replace(SEASON_SUFFIX, "").trim();
+    const normalizedQuery = normalizeTitle(query);
+    if (!normalizedQuery) continue;
+
+    const seasonQualified = SEASON_SUFFIX.test(title);
+    const key = `${normalizedQuery}:${seasonQualified}`;
+    if (!searchQueries.has(key)) {
+      searchQueries.set(key, { query, seasonQualified });
+    }
+  }
+  if (searchQueries.size === 0) return null;
+
+  for (const { query, seasonQualified } of searchQueries.values()) {
+    const url = new URL(`${TVDB_API_URL}/search`);
+    url.searchParams.set("query", query);
+    url.searchParams.set("type", "series");
+    // Numbered anime seasons can belong to a TVDB series that premiered years earlier.
+    if (!seasonQualified && isPositiveSafeInteger(candidate.year)) {
+      url.searchParams.set("year", String(candidate.year));
+    }
+
+    // Cache public search metadata, never API keys or bearer tokens.
+    const data = await cached<TvdbSearchResponse>(
+      `tvdb:search:${url}`,
+      CACHE_TTL / 1000,
+      async () => {
+        const token = await getTvdbToken(apiKey);
+        const response = await fetch(url, {
+          headers: { authorization: `Bearer ${token}` },
+        });
+        if (!response.ok) throw new Error(`TVDB search failed: ${response.status}`);
+        return await response.json() as TvdbSearchResponse;
+      }
+    );
+    const matchingIds = new Set<number>();
+    for (const result of data.data ?? []) {
+      const isExactMatch = [result.name, ...(result.aliases ?? [])].some(
+        (title) =>
+          typeof title === "string" && expectedTitles.has(normalizeTitle(title))
+      );
+      if (!isExactMatch) continue;
+
+      const match = /^series-(\d+)$/.exec(result.objectID ?? "");
+      const tvdbId = match ? Number(match[1]) : null;
+      if (!isPositiveSafeInteger(tvdbId)) return null;
+      matchingIds.add(tvdbId);
+      if (matchingIds.size > 1) return null;
+    }
+
+    if (matchingIds.size === 1) return matchingIds.values().next().value ?? null;
+  }
+
+  return null;
 }
 
 async function resolveMissingTvdbIds(
@@ -160,12 +241,11 @@ async function resolveMissingTvdbIds(
 ): Promise<void> {
   if (!apiKey) return;
   for (const candidate of candidates) {
-    if (result.has(candidate.id)) continue;
+    if (!isPositiveSafeInteger(candidate.id) || result.has(candidate.id)) continue;
     const tvdbId = await findTvdbSeriesId(candidate, apiKey);
-    if (tvdbId) result.set(candidate.id, tvdbId);
+    if (isPositiveSafeInteger(tvdbId)) result.set(candidate.id, tvdbId);
   }
 }
-
 
 async function batchGetTvdbIdsFromMappings(
   ids: number[],
@@ -178,9 +258,11 @@ async function batchGetTvdbIdsFromMappings(
   const mappings = await loadMappings();
   const result = new Map<number, number>();
   for (const id of ids) {
+    if (!isPositiveSafeInteger(id)) continue;
     const entry = mappings[index].get(id);
-    if (entry?.tvdb_id) result.set(id, entry.tvdb_id);
+    if (isPositiveSafeInteger(entry?.tvdb_id)) result.set(id, entry.tvdb_id);
   }
+
 
   await resolveMissingTvdbIds(result, candidates, tvdbApiKey);
   return result;

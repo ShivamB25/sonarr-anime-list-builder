@@ -3,7 +3,7 @@ const ANILIST_URL = "https://graphql.anilist.co";
 const SEASONAL_QUERY = `
 query ($season: MediaSeason, $seasonYear: Int, $page: Int, $perPage: Int) {
   Page(page: $page, perPage: $perPage) {
-    pageInfo { hasNextPage currentPage lastPage total }
+    pageInfo { hasNextPage }
     media(
       type: ANIME
       season: $season

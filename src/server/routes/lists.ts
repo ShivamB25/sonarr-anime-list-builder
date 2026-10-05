@@ -236,13 +236,17 @@ listsRouter.get("/:id/sonarr", async (c) => {
     .where(eq(listItems.listId, listId));
 
   const anilistIds = items.map((i) => i.anilistId);
-  const tvdbMap = await batchGetTvdbIds(anilistIds);
+  const tvdbMap = await batchGetTvdbIds(
+    anilistIds,
+    items.map((item) => ({
+      id: item.anilistId,
+      title: item.titleEnglish ?? item.title,
+      alternateTitles: [item.title],
+    })),
+    c.env.TVDB_API_KEY
+  );
 
-  const sonarrEntries: { TvdbId: number }[] = [];
-  for (const id of anilistIds) {
-    const tvdbId = tvdbMap.get(id);
-    if (tvdbId) sonarrEntries.push({ TvdbId: tvdbId });
-  }
+  const sonarrEntries = [...new Set(tvdbMap.values())].map((TvdbId) => ({ TvdbId }));
 
   c.header("Cache-Control", "public, max-age=3600, s-maxage=3600");
   c.header("Content-Type", "application/json");
