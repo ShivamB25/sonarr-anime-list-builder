@@ -106,11 +106,11 @@ refreshes that complete season immediately, bypassing the 24-hour freshness
 interval. Both `season` and a positive integer `year` are required for a targeted
 run; historical years outside the automatic two-year range are also supported.
 
-Apply migrations through `0006_gray_lightspeed.sql` before deploying this version
-(`bun run db:migrate:remote` for Workers; Bun applies them at local startup).
-Migration 0005 preserves existing guest sessions, lists, items, and AniList cards
-while adding native MAL identities. Migration 0006 stores continuing membership
-for feed filtering; old unclassified entries remain included until refreshed.
+Apply migration `0005_right_wrecking_crew.sql` before deploying this version
+(`bun run db:migrate:remote` for Workers; Bun applies it at local startup).
+It preserves existing guest sessions, lists, items, and AniList cards while
+adding native MAL identities and continuing membership for feed filtering.
+Old unclassified feed entries remain included until refreshed.
 Then force a refresh to populate MAL browse snapshots and feed classification,
 even if the previous feed-only MAL sync is still within 24 hours.
 

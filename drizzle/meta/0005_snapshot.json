@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "7046681e-983f-4ff9-ba92-3fd5085bdfa2",
+  "id": "13254a04-4c0f-466e-a9f4-07ea5b4868b3",
   "prevId": "a1a7c56a-aedf-4d95-80fa-637a50bafef6",
   "tables": {
     "list_items": {
@@ -226,6 +226,14 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "is_continuing": {
+          "name": "is_continuing",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
         },
         "sync_run_at": {
           "name": "sync_run_at",

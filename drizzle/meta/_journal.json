@@ -43,13 +43,6 @@
       "when": 1791586704402,
       "tag": "0005_right_wrecking_crew",
       "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "6",
-      "when": 1791588110937,
-      "tag": "0006_gray_lightspeed",
-      "breakpoints": true
     }
   ]
 }

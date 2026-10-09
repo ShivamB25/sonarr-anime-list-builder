@@ -59,3 +59,5 @@ INSERT INTO `__new_list_items`("id", "list_id", "anilist_id", "mal_id", "title",
 DROP TABLE `list_items`;--> statement-breakpoint
 ALTER TABLE `__new_list_items` RENAME TO `list_items`;--> statement-breakpoint
 CREATE INDEX `list_items_list_added_idx` ON `list_items` (`list_id`,`added_at`);
+--> statement-breakpoint
+ALTER TABLE `season_feed_entries` ADD `is_continuing` integer DEFAULT 0 NOT NULL;

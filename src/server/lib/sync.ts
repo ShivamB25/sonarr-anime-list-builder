@@ -398,14 +398,12 @@ async function syncMAL(
     );
     const catalog = malMedia.filter((item) => item.nsfw !== "black");
     const browseMedia = catalog.map((item) => malBrowseMedia(item, target));
-    let anilistIds = new Map<number, number>();
-    let mappingFailed = false;
-    let mappingError: unknown;
+    let anilistIds: Map<number, number>;
     try {
       anilistIds = await getAniListIdsFromMal(catalog.map((item) => item.id));
     } catch (error) {
-      mappingFailed = true;
-      mappingError = error;
+      await publishBrowseSnapshot(d1, target, "mal", browseMedia, syncRunAt);
+      throw error;
     }
     await publishBrowseSnapshot(
       d1,
@@ -415,21 +413,19 @@ async function syncMAL(
       syncRunAt,
       anilistIds
     );
-    if (mappingFailed) throw mappingError;
-    const eligibleMedia = malMedia.filter((item) =>
-      (item.media_type === "tv" || item.media_type === "ona") &&
-      item.nsfw !== "black"
+    const eligibleMedia = catalog.filter((item) =>
+      item.media_type === "tv" || item.media_type === "ona"
     );
     const malIds = eligibleMedia.map((item) => item.id);
-    const candidates = eligibleMedia.flatMap((item) => {
+    const candidates = eligibleMedia.map((item) => {
       const startYear = Number(item.start_date?.slice(0, 4));
-      return [{
+      return {
         id: item.id,
         title: item.title,
         ...(Number.isInteger(startYear) && startYear > 0
           ? { year: startYear }
           : {}),
-      }];
+      };
     });
     const tvdbMap = await batchGetTvdbIdsFromMal(
       malIds,
