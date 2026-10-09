@@ -1,5 +1,4 @@
 # Sonarr Anime List Builder
-
 Source-available seasonal anime import-list builder for Sonarr. Browse AniList and
 MyAnimeList metadata, create custom lists, and expose Sonarr-compatible TVDB
 feeds. Run it on Cloudflare Workers with D1 or self-host it with Bun and SQLite.
