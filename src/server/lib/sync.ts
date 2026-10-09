@@ -8,7 +8,7 @@ import {
   getAniListIdsFromMal,
   type TvdbLookupCandidate,
 } from "./anime-mapping";
-import { SEASONS, type Season } from "../../shared/season";
+import { SEASONS, startsBeforeSeason, type Season } from "../../shared/season";
 
 const ANILIST_PER_PAGE = 50;
 const BROWSE_PAGE_SIZE = 25;
@@ -245,26 +245,46 @@ async function publishBrowseSnapshot(
   await d1.batch(statements);
 }
 
+type SeasonFeedRow = { tvdbId: number; isContinuing: 0 | 1 };
+
+function seasonFeedRows(
+  target: SyncTarget,
+  media: readonly AniListMedia[],
+  tvdbIds: ReadonlyMap<number, number>
+): SeasonFeedRow[] {
+  const rows = new Map<number, SeasonFeedRow>();
+  for (const item of media) {
+    const tvdbId = tvdbIds.get(item.id);
+    if (tvdbId === undefined) continue;
+    const isContinuing = startsBeforeSeason(item.startDate, target.season, target.year) ? 1 : 0;
+    const existing = rows.get(tvdbId);
+    // Keep a shared TVDB series when any mapped entry premieres this quarter.
+    if (!existing) rows.set(tvdbId, { tvdbId, isContinuing });
+    else if (existing.isContinuing === 1 && isContinuing === 0) existing.isContinuing = 0;
+  }
+  return [...rows.values()];
+}
+
 async function publishFeedSnapshot(
   d1: D1Database,
   target: SyncTarget,
   source: SyncSource,
-  tvdbIds: readonly number[],
+  entries: readonly SeasonFeedRow[],
   syncRunAt: number
 ): Promise<void> {
-  const uniqueTvdbIds = [...new Set(tvdbIds)];
   const statements: D1PreparedStatement[] = [
     d1.prepare(
       "DELETE FROM season_feed_entries WHERE season = ? AND year = ? AND source = ?"
     ).bind(target.season, target.year, source),
   ];
-  if (uniqueTvdbIds.length > 0) {
+  if (entries.length > 0) {
     statements.push(
       d1.prepare(`
         INSERT INTO season_feed_entries (
-          season, year, tvdb_id, source, sync_run_at, updated_at
+          season, year, tvdb_id, source, is_continuing, sync_run_at, updated_at
         )
-        SELECT ?, ?, CAST(item.value AS INTEGER), ?, ?, ?
+        SELECT ?, ?, CAST(json_extract(item.value, '$.tvdbId') AS INTEGER), ?,
+          CAST(json_extract(item.value, '$.isContinuing') AS INTEGER), ?, ?
         FROM json_each(?) AS item
       `).bind(
         target.season,
@@ -272,7 +292,7 @@ async function publishFeedSnapshot(
         source,
         syncRunAt,
         syncRunAt,
-        JSON.stringify(uniqueTvdbIds)
+        JSON.stringify(entries)
       )
     );
   }
@@ -321,7 +341,7 @@ async function syncAniList(
       d1,
       target,
       "anilist",
-      [...tvdbMap.values()],
+      seasonFeedRows(target, eligibleMedia, tvdbMap),
       syncRunAt
     );
   } catch (error) {
@@ -377,6 +397,7 @@ async function syncMAL(
       malClientId
     );
     const catalog = malMedia.filter((item) => item.nsfw !== "black");
+    const browseMedia = catalog.map((item) => malBrowseMedia(item, target));
     let anilistIds = new Map<number, number>();
     let mappingFailed = false;
     let mappingError: unknown;
@@ -390,7 +411,7 @@ async function syncMAL(
       d1,
       target,
       "mal",
-      catalog.map((item) => malBrowseMedia(item, target)),
+      browseMedia,
       syncRunAt,
       anilistIds
     );
@@ -419,7 +440,7 @@ async function syncMAL(
       d1,
       target,
       "mal",
-      [...tvdbMap.values()],
+      seasonFeedRows(target, browseMedia, tvdbMap),
       syncRunAt
     );
   } catch (error) {

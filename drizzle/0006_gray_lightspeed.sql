@@ -1,0 +1,1 @@
+ALTER TABLE `season_feed_entries` ADD `is_continuing` integer DEFAULT 0 NOT NULL;

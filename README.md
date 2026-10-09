@@ -39,13 +39,19 @@ there is no account UI or cross-device account sync.
   ONA entries with MAL TV and ONA entries. Configure `MAL_CLIENT_ID` to include
   MAL's continuing series; AniList's premiere catalog alone is not a complete
   list of everything airing during the quarter.
-- Membership follows each provider's selected season, not status today or a
-  local start-date cutoff. MAL's seasonal endpoint includes continuing series:
-  One Piece, Conan, Sazae-san, and Steel Ball Run follow the same rule. Earlier
-  premieres, partial dates, and unknown dates are retained. AniList instead
-  uses its `season`/`seasonYear` release assignment; providers may disagree.
+- Membership follows each provider's selected season, not status today. Both
+  seasonal endpoints accept `includeContinuing=true|false`, defaulting to `true`
+  so existing Sonarr imports keep their coverage. MAL's seasonal endpoint
+  includes One Piece, Conan, Sazae-san, and Steel Ball Run under the same rule.
+  With `false`, entries whose known start year/month precede the selected
+  calendar quarter are excluded. Missing year/month is retained unless a known
+  year alone proves an earlier premiere; an unknown day does not exclude a title.
+  A TVDB series remains if any mapped entry qualifies. The rule applies to both
+  browse rows/counts and feeds, without title-specific exceptions.
+  AniList uses its `season`/`seasonYear` release assignment; providers may disagree.
   For example, MAL includes Ghost Meets Gal! (September 5) and Link Click III
-  (August 14) in Fall 2026, although AniList does not assign them to that season.
+  (August 14) in Fall 2026 by default; `includeContinuing=false` excludes those
+  known earlier premieres. AniList does not assign them to that season.
   Cancelled AniList entries and non-series formats are excluded from the Sonarr
   feed, not from browse cards. MAL requests include gray-rated titles, which its
   default API filter hides; black-rated titles remain excluded.
@@ -83,9 +89,10 @@ there is no account UI or cross-device account sync.
   MAL continues refreshing its browse snapshot and Sonarr feed. AniList's
   error remains in sync diagnostics; a MAL refresh does not mean AniList access
   has recovered. Resolve that restriction with AniList rather than bypassing it.
-- Browse/feed read caches last 60 seconds and include season, year, and browse
-  page. Add `cacheBust=true` to either `/api/anime/seasonal` or
-  `/api/anime/season-feed` to read D1 directly with `Cache-Control: no-store`.
+- Browse/feed read caches last 60 seconds and include season, year,
+  `includeContinuing`, and browse page. Add `cacheBust=true` to either
+  `/api/anime/seasonal` or `/api/anime/season-feed` to read D1 directly with
+  `Cache-Control: no-store`.
   The default is `false`; only `true` and `false` are accepted. This bypasses
   read caches, not provider sync freshness.
 
@@ -99,11 +106,13 @@ refreshes that complete season immediately, bypassing the 24-hour freshness
 interval. Both `season` and a positive integer `year` are required for a targeted
 run; historical years outside the automatic two-year range are also supported.
 
-Apply migration `0005_right_wrecking_crew.sql` before deploying this version
-(`bun run db:migrate:remote` for Workers; Bun applies it at local startup).
-It preserves existing guest sessions, lists, items, and AniList cards while
-adding native MAL identities. Then force a refresh to populate MAL browse
-snapshots even if the previous feed-only MAL sync is still within 24 hours.
+Apply migrations through `0006_gray_lightspeed.sql` before deploying this version
+(`bun run db:migrate:remote` for Workers; Bun applies them at local startup).
+Migration 0005 preserves existing guest sessions, lists, items, and AniList cards
+while adding native MAL identities. Migration 0006 stores continuing membership
+for feed filtering; old unclassified entries remain included until refreshed.
+Then force a refresh to populate MAL browse snapshots and feed classification,
+even if the previous feed-only MAL sync is still within 24 hours.
 
 If AniList remains blocked, the response still reports HTTP 502 and an AniList
 source error even when MAL publishes successfully. Inspect `result.errors`

@@ -68,6 +68,7 @@ export const seasonFeedEntries = sqliteTable(
     year: integer("year").notNull(),
     tvdbId: integer("tvdb_id").notNull(),
     source: text("source").notNull(), // "anilist" | "mal"
+    isContinuing: integer("is_continuing").notNull().default(0),
     syncRunAt: integer("sync_run_at").notNull(),
     updatedAt: integer("updated_at").notNull(),
   },
