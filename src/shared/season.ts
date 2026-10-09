@@ -20,3 +20,14 @@ export function getCurrentSeason(date = new Date()): Season {
   if (month <= 9) return "SUMMER";
   return "FALL";
 }
+
+export function startsBeforeSeason(
+  date: { year: number | null; month: number | null },
+  season: Season,
+  year: number
+): boolean {
+  if (date.year === null || date.year < 1) return false;
+  if (date.year !== year) return date.year < year;
+  return date.month !== null && date.month >= 1 &&
+    date.month < SEASONS.indexOf(season) * 3 + 1;
+}

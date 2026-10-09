@@ -24,7 +24,7 @@ export default function VirtualAnimeGrid({ anime, onAdd }: Props) {
         const studio = item.studios.nodes[0]?.name;
 
         return (
-          <li key={item.id} className="min-w-0">
+          <li key={`${item.source}:${item.id}`} className="min-w-0">
             <article className="group overflow-hidden rounded-2xl border border-border bg-surface shadow-[0_18px_50px_rgb(0_0_0/0.18)] transition-colors hover:border-accent/60 focus-within:border-accent forced-colors:border-2">
               <div className="relative aspect-[3/4] overflow-hidden bg-surface-raised">
                 <img

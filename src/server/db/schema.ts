@@ -42,7 +42,8 @@ export const listItems = sqliteTable(
     listId: text("list_id")
       .notNull()
       .references(() => lists.id, { onDelete: "cascade" }),
-    anilistId: integer("anilist_id").notNull(),
+    anilistId: integer("anilist_id"),
+    malId: integer("mal_id"),
     title: text("title").notNull(),
     titleEnglish: text("title_english"),
     coverImage: text("cover_image"),
@@ -67,6 +68,7 @@ export const seasonFeedEntries = sqliteTable(
     year: integer("year").notNull(),
     tvdbId: integer("tvdb_id").notNull(),
     source: text("source").notNull(), // "anilist" | "mal"
+    isContinuing: integer("is_continuing").notNull().default(0),
     syncRunAt: integer("sync_run_at").notNull(),
     updatedAt: integer("updated_at").notNull(),
   },
@@ -96,7 +98,7 @@ export const seasonFeedSync = sqliteTable(
   (t) => [primaryKey({ columns: [t.season, t.year, t.source] })]
 );
 
-// Persisted AniList seasonal browse cards for fast homepage/load-more reads
+// Independent source snapshots; browse merges verified provider identities.
 export const seasonalBrowseItems = sqliteTable(
   "seasonal_browse_items",
   {
@@ -104,7 +106,10 @@ export const seasonalBrowseItems = sqliteTable(
     year: integer("year").notNull(),
     page: integer("page").notNull(),
     sortOrder: integer("sort_order").notNull(),
-    anilistId: integer("anilist_id").notNull(),
+    source: text("source").notNull(),
+    sourceId: integer("source_id").notNull(),
+    anilistId: integer("anilist_id"),
+    malId: integer("mal_id"),
     titleRomaji: text("title_romaji").notNull(),
     titleEnglish: text("title_english"),
     titleNative: text("title_native"),
@@ -130,7 +135,7 @@ export const seasonalBrowseItems = sqliteTable(
     updatedAt: integer("updated_at").notNull(),
   },
   (table) => [
-    primaryKey({ columns: [table.season, table.year, table.anilistId] }),
+    primaryKey({ columns: [table.season, table.year, table.source, table.sourceId] }),
     index("seasonal_browse_items_page_idx").on(
       table.season,
       table.year,

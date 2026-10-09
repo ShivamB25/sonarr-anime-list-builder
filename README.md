@@ -26,17 +26,35 @@ there is no account UI or cross-device account sync.
 
 ### Seasonal coverage
 
-- `/api/anime/seasonal` browses AniList's season-of-release catalog.
+- `/api/anime/seasonal` merges independent AniList and MAL browse snapshots.
+  With `MAL_CLIENT_ID` configured, MAL contributes full card metadata for all
+  seasonal formats, including ONA, OVAs, specials, movies, and shorts. MAL can
+  refresh browsing even when AniList is blocked. Without that key, browsing
+  remains AniList-only.
+  Cards expose `source`, source-native `id`, nullable `anilistId`, and nullable
+  `malId`; MAL IDs are never presented as AniList IDs. Known cross-provider
+  duplicates use Fribb's verified AniList/MAL association, not title text or
+  TVDB series IDs. MAL cards take precedence; unmatched AniList cards remain.
 - `/api/anime/season-feed` merges TVDB mappings from AniList TV, TV-short, and
   ONA entries with MAL TV and ONA entries. Configure `MAL_CLIENT_ID` to include
   MAL's continuing series; AniList's premiere catalog alone is not a complete
   list of everything airing during the quarter.
-- Membership follows the source's selected season, not a show's status today.
-  Finished shows remain in historical feeds, and continuing shows have no
-  arbitrary start-year cutoff. Unknown start dates do not block Fribb mappings.
-  Cancelled AniList entries and non-series formats are excluded from the feed.
-  MAL requests include gray-rated titles, which its default API filter hides;
-  black-rated titles remain excluded.
+- Membership follows each provider's selected season, not status today. Both
+  seasonal endpoints accept `includeContinuing=true|false`, defaulting to `true`
+  so existing Sonarr imports keep their coverage. MAL's seasonal endpoint
+  includes One Piece, Conan, Sazae-san, and Steel Ball Run under the same rule.
+  With `false`, entries whose known start year/month precede the selected
+  calendar quarter are excluded. Missing year/month is retained unless a known
+  year alone proves an earlier premiere; an unknown day does not exclude a title.
+  A TVDB series remains if any mapped entry qualifies. The rule applies to both
+  browse rows/counts and feeds, without title-specific exceptions.
+  AniList uses its `season`/`seasonYear` release assignment; providers may disagree.
+  For example, MAL includes Ghost Meets Gal! (September 5) and Link Click III
+  (August 14) in Fall 2026 by default; `includeContinuing=false` excludes those
+  known earlier premieres. AniList does not assign them to that season.
+  Cancelled AniList entries and non-series formats are excluded from the Sonarr
+  feed, not from browse cards. MAL requests include gray-rated titles, which its
+  default API filter hides; black-rated titles remain excluded.
 - Sonarr imports TVDB **series**, so multiple anime seasons can collapse to one
   `TvdbId`. Entries without a verified TVDB series ID cannot be exported.
   `TVDB_API_KEY` enables conservative fallback searches using English, Romaji,
@@ -45,9 +63,10 @@ there is no account UI or cross-device account sync.
   restriction; other dated titles retain their year restriction. Matches must
   have a unique exact normalized title or alias. Ambiguous matches are omitted,
   and no title-specific overrides are maintained.
-  Custom-list feeds also use `TVDB_API_KEY`, with their stored English/original
-  titles as lookup candidates, and deduplicate results by TVDB series ID. List
-  items do not store premiere dates, so their fallback has no year restriction.
+  Custom-list feeds support both AniList and MAL items, use `TVDB_API_KEY` with
+  stored English/original titles as lookup candidates, and deduplicate by TVDB
+  series ID. List items do not store premiere dates, so their fallback has no
+  year restriction.
   Successful TVDB search responses (including no-match results) are cached for
   six hours through the existing memory/edge cache; API failures are not cached.
 - Automatic sync covers the current and previous calendar years, processing one
@@ -58,7 +77,7 @@ there is no account UI or cross-device account sync.
 - Complete catalog and source-feed snapshots are replaced in atomic D1 batches,
   using bulk JSON inserts instead of one query per title. Failed provider pages
   retain the previous snapshot. TVDB mapping failures retain the previous feed
-  but do not prevent a complete AniList browse catalog from being published.
+  but do not prevent complete AniList or MAL browse snapshots from being published.
 - Provider failures do not stop the other sources from syncing. The authenticated
   `POST /api/admin/run-sync` returns HTTP 502 with `ok: false` and per-season,
   per-source errors when any source fails; successful selected passes return HTTP
@@ -66,10 +85,16 @@ there is no account UI or cross-device account sync.
   automatic work is due. Success does not mean all eight seasons ran at once.
   Scheduled sync failures are also propagated to Cloudflare instead of silently
   appearing successful.
-- An upstream access block can leave AniList's browse catalog stale while MAL
-  continues updating the Sonarr feed. AniList's error message is retained in sync
-  diagnostics. Resolve access restrictions with the provider; successful MAL
-  updates do not mean AniList has refreshed.
+- An upstream access block leaves the previous AniList snapshot intact while
+  MAL continues refreshing its browse snapshot and Sonarr feed. AniList's
+  error remains in sync diagnostics; a MAL refresh does not mean AniList access
+  has recovered. Resolve that restriction with AniList rather than bypassing it.
+- Browse/feed read caches last 60 seconds and include season, year,
+  `includeContinuing`, and browse page. Add `cacheBust=true` to either
+  `/api/anime/seasonal` or `/api/anime/season-feed` to read D1 directly with
+  `Cache-Control: no-store`.
+  The default is `false`; only `true` and `false` are accepted. This bypasses
+  read caches, not provider sync freshness.
 
 The self-hosted SQLite adapter exposes asynchronous D1 statement results while
 executing batch writes synchronously inside a single SQLite transaction.
@@ -80,6 +105,19 @@ The authenticated `POST /api/admin/run-sync?season=FALL&year=2026&force=true`
 refreshes that complete season immediately, bypassing the 24-hour freshness
 interval. Both `season` and a positive integer `year` are required for a targeted
 run; historical years outside the automatic two-year range are also supported.
+
+Apply migration `0005_right_wrecking_crew.sql` before deploying this version
+(`bun run db:migrate:remote` for Workers; Bun applies it at local startup).
+It preserves existing guest sessions, lists, items, and AniList cards while
+adding native MAL identities and continuing membership for feed filtering.
+Old unclassified feed entries remain included until refreshed.
+Then force a refresh to populate MAL browse snapshots and feed classification,
+even if the previous feed-only MAL sync is still within 24 hours.
+
+If AniList remains blocked, the response still reports HTTP 502 and an AniList
+source error even when MAL publishes successfully. Inspect `result.errors`
+and read `/api/anime/seasonal?season=FALL&year=2026&cacheBust=true` to verify
+the recovered catalog; do not treat a partial provider failure as an unblock.
 
 After deployment, refill all eight automatically supported seasons with Bun.
 Store `ADMIN_SYNC_TOKEN` in an ignored `.env` file and set `SYNC_BASE_URL` to your

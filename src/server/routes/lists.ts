@@ -4,7 +4,7 @@ import { drizzle } from "drizzle-orm/d1";
 import { and, eq } from "drizzle-orm";
 import { lists, listItems } from "../db/schema";
 import { getOrCreateGuest } from "../lib/auth";
-import { batchGetTvdbIds } from "../lib/anime-mapping";
+import { batchGetTvdbIds, batchGetTvdbIdsFromMal } from "../lib/anime-mapping";
 import type { AppEnv } from "../env";
 import { isSeason } from "../../shared/season";
 
@@ -18,7 +18,8 @@ interface CreateListBody {
 }
 
 interface CreateListItemBody {
-  anilistId: number;
+  anilistId?: number | null;
+  malId?: number | null;
   title: string;
   titleEnglish?: string | null;
   coverImage?: string | null;
@@ -45,16 +46,36 @@ function isCreateListBody(value: unknown): value is CreateListBody {
   );
 }
 
+function isOptionalPositiveSafeInteger(
+  value: unknown,
+  hasValue: boolean
+): boolean {
+  return (
+    !hasValue ||
+    value === null ||
+    (typeof value === "number" &&
+      Number.isSafeInteger(value) &&
+      value > 0)
+  );
+}
+
 function isCreateListItemBody(value: unknown): value is CreateListItemBody {
   return (
     typeof value === "object" &&
     value !== null &&
-    "anilistId" in value &&
-    Number.isInteger(value.anilistId) &&
-    Number(value.anilistId) > 0 &&
     "title" in value &&
     typeof value.title === "string" &&
     value.title.length > 0 &&
+    isOptionalPositiveSafeInteger(
+      "anilistId" in value ? value.anilistId : undefined,
+      "anilistId" in value && value.anilistId !== undefined
+    ) &&
+    isOptionalPositiveSafeInteger(
+      "malId" in value ? value.malId : undefined,
+      "malId" in value && value.malId !== undefined
+    ) &&
+    (("anilistId" in value && value.anilistId != null) ||
+      ("malId" in value && value.malId != null)) &&
     (!("titleEnglish" in value) ||
       value.titleEnglish === null ||
       typeof value.titleEnglish === "string") &&
@@ -181,7 +202,8 @@ listsRouter.post("/:id/items", async (c) => {
     .values({
       id,
       listId,
-      anilistId: body.anilistId,
+      anilistId: body.anilistId ?? null,
+      malId: body.malId ?? null,
       title: body.title,
       titleEnglish: body.titleEnglish ?? null,
       coverImage: body.coverImage ?? null,
@@ -235,18 +257,37 @@ listsRouter.get("/:id/sonarr", async (c) => {
     .from(listItems)
     .where(eq(listItems.listId, listId));
 
-  const anilistIds = items.map((i) => i.anilistId);
+  const anilistItems = items.filter(
+    (item): item is typeof item & { anilistId: number } =>
+      item.anilistId !== null
+  );
+  const malItems = items.filter(
+    (item): item is typeof item & { malId: number } => item.malId !== null
+  );
   const tvdbMap = await batchGetTvdbIds(
-    anilistIds,
-    items.map((item) => ({
+    anilistItems.map((item) => item.anilistId),
+    anilistItems.map((item) => ({
       id: item.anilistId,
       title: item.titleEnglish ?? item.title,
       alternateTitles: [item.title],
     })),
     c.env.TVDB_API_KEY
   );
+  const unresolvedMalItems = malItems.filter(
+    (item) => item.anilistId === null || !tvdbMap.has(item.anilistId)
+  );
+  const malTvdbMap = await batchGetTvdbIdsFromMal(
+    unresolvedMalItems.map((item) => item.malId),
+    unresolvedMalItems.map((item) => ({
+      id: item.malId,
+      title: item.titleEnglish ?? item.title,
+      alternateTitles: [item.title],
+    })),
+    c.env.TVDB_API_KEY
+  );
+  const sonarrEntries = [...new Set([...tvdbMap.values(), ...malTvdbMap.values()])]
+    .map((TvdbId) => ({ TvdbId }));
 
-  const sonarrEntries = [...new Set(tvdbMap.values())].map((TvdbId) => ({ TvdbId }));
 
   c.header("Cache-Control", "public, max-age=3600, s-maxage=3600");
   c.header("Content-Type", "application/json");

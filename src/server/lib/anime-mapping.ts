@@ -22,6 +22,7 @@ type MappingEntry = {
 type MappingIndexes = {
   byAnilist: Map<number, MappingEntry>;
   byMal: Map<number, MappingEntry>;
+  anilistByMal: Map<number, number>;
 };
 
 
@@ -41,6 +42,7 @@ interface TvdbSearchResponse {
 
 let byAnilist: Map<number, MappingEntry> | null = null;
 let byMal: Map<number, MappingEntry> | null = null;
+let anilistByMal: Map<number, number> | null = null;
 let cacheTimestamp = 0;
 let tvdbToken: string | null = null;
 let tvdbTokenTimestamp = 0;
@@ -86,9 +88,27 @@ function buildMappingIndex(
   return index;
 }
 
+function buildAniListByMalIndex(entries: readonly MappingEntry[]): Map<number, number> {
+  const index = new Map<number, number>();
+  const conflicts = new Set<number>();
+  for (const entry of entries) {
+    const malId = entry.mal_id;
+    const anilistId = entry.anilist_id;
+    if (!isPositiveSafeInteger(malId) || !isPositiveSafeInteger(anilistId) || conflicts.has(malId)) continue;
+    const existing = index.get(malId);
+    if (existing !== undefined && existing !== anilistId) {
+      index.delete(malId);
+      conflicts.add(malId);
+    } else {
+      index.set(malId, anilistId);
+    }
+  }
+  return index;
+}
+
 async function loadMappings(): Promise<MappingIndexes> {
-  if (byAnilist && byMal && Date.now() - cacheTimestamp < CACHE_TTL) {
-    return { byAnilist, byMal };
+  if (byAnilist && byMal && anilistByMal && Date.now() - cacheTimestamp < CACHE_TTL) {
+    return { byAnilist, byMal, anilistByMal };
   }
 
   if (!mappingRequest) {
@@ -102,11 +122,13 @@ async function loadMappings(): Promise<MappingIndexes> {
       const entries = (payload as unknown[]).filter(isMappingEntry);
       const nextByAnilist = buildMappingIndex(entries, "anilist_id");
       const nextByMal = buildMappingIndex(entries, "mal_id");
+      const nextAnilistByMal = buildAniListByMalIndex(entries);
 
       byAnilist = nextByAnilist;
       byMal = nextByMal;
+      anilistByMal = nextAnilistByMal;
       cacheTimestamp = Date.now();
-      return { byAnilist, byMal };
+      return { byAnilist, byMal, anilistByMal };
     })().finally(() => {
       mappingRequest = null;
     });
@@ -282,4 +304,14 @@ export async function batchGetTvdbIdsFromMal(
   tvdbApiKey?: string
 ): Promise<Map<number, number>> {
   return batchGetTvdbIdsFromMappings(malIds, "byMal", candidates, tvdbApiKey);
+}
+
+export async function getAniListIdsFromMal(malIds: readonly number[]): Promise<Map<number, number>> {
+  const mappings = await loadMappings();
+  const result = new Map<number, number>();
+  for (const malId of malIds) {
+    const anilistId = mappings.anilistByMal.get(malId);
+    if (anilistId !== undefined) result.set(malId, anilistId);
+  }
+  return result;
 }
