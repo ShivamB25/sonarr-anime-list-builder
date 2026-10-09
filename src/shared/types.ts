@@ -37,6 +37,9 @@ export interface AnimeStudios {
 
 export interface AnimeMedia {
   id: number;
+  source: "anilist" | "mal";
+  anilistId: number | null;
+  malId: number | null;
   title: AnimeTitle;
   coverImage: AnimeCoverImage;
   bannerImage: string | null;
@@ -76,7 +79,8 @@ export interface List {
 export interface ListItem {
   id: string;
   listId: string;
-  anilistId: number;
+  anilistId: number | null;
+  malId: number | null;
   title: string;
   titleEnglish: string | null;
   coverImage: string | null;

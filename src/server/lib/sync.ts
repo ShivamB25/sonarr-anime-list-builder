@@ -1,10 +1,11 @@
 import { drizzle } from "drizzle-orm/d1";
 import { seasonFeedSync } from "../db/schema";
 import { gqlRequestPage, type AniListMedia } from "./anilist";
-import { getAllMALSeasonalAnime } from "./mal";
+import { getAllMALSeasonalAnime, type MALAnime } from "./mal";
 import {
   batchGetTvdbIds,
   batchGetTvdbIdsFromMal,
+  getAniListIdsFromMal,
   type TvdbLookupCandidate,
 } from "./anime-mapping";
 import { SEASONS, type Season } from "../../shared/season";
@@ -110,12 +111,17 @@ async function fetchAniListSeason(target: SyncTarget): Promise<AniListMedia[]> {
 function browseRows(
   season: Season,
   year: number,
-  media: readonly AniListMedia[]
+  media: readonly AniListMedia[],
+  source: SyncSource,
+  anilistIds?: ReadonlyMap<number, number>
 ) {
   return media.map((item, sortOrder) => ({
     page: Math.floor(sortOrder / BROWSE_PAGE_SIZE) + 1,
     sortOrder,
-    anilistId: item.id,
+    source,
+    sourceId: item.id,
+    anilistId: source === "anilist" ? item.id : anilistIds?.get(item.id) ?? null,
+    malId: source === "mal" ? item.id : null,
     titleRomaji: item.title.romaji ?? "",
     titleEnglish: item.title.english ?? null,
     titleNative: item.title.native ?? null,
@@ -142,7 +148,7 @@ function browseRows(
 
 const INSERT_BROWSE_ROWS = `
   INSERT INTO seasonal_browse_items (
-    season, year, page, sort_order, anilist_id,
+    season, year, page, sort_order, source, source_id, anilist_id, mal_id,
     title_romaji, title_english, title_native,
     cover_image_large, cover_image_medium, banner_image,
     format, status, episodes, average_score, genres_json,
@@ -155,7 +161,10 @@ const INSERT_BROWSE_ROWS = `
     ?, ?,
     CAST(json_extract(item.value, '$.page') AS INTEGER),
     CAST(json_extract(item.value, '$.sortOrder') AS INTEGER),
+    json_extract(item.value, '$.source'),
+    CAST(json_extract(item.value, '$.sourceId') AS INTEGER),
     CAST(json_extract(item.value, '$.anilistId') AS INTEGER),
+    CAST(json_extract(item.value, '$.malId') AS INTEGER),
     json_extract(item.value, '$.titleRomaji'),
     json_extract(item.value, '$.titleEnglish'),
     json_extract(item.value, '$.titleNative'),
@@ -210,15 +219,17 @@ async function markSyncAttempt(
 async function publishBrowseSnapshot(
   d1: D1Database,
   target: SyncTarget,
+  source: SyncSource,
   media: readonly AniListMedia[],
-  syncRunAt: number
+  syncRunAt: number,
+  anilistIds?: ReadonlyMap<number, number>
 ): Promise<void> {
   const statements: D1PreparedStatement[] = [
     d1.prepare(
-      "DELETE FROM seasonal_browse_items WHERE season = ? AND year = ?"
-    ).bind(target.season, target.year),
+      "DELETE FROM seasonal_browse_items WHERE season = ? AND year = ? AND source = ?"
+    ).bind(target.season, target.year, source),
   ];
-  const rows = browseRows(target.season, target.year, media);
+  const rows = browseRows(target.season, target.year, media, source, anilistIds);
   if (rows.length > 0) {
     statements.push(
       d1.prepare(INSERT_BROWSE_ROWS).bind(
@@ -230,7 +241,7 @@ async function publishBrowseSnapshot(
       )
     );
   }
-  statements.push(syncStateStatement(d1, target, "anilist", syncRunAt, 0));
+  statements.push(syncStateStatement(d1, target, source, syncRunAt, 0));
   await d1.batch(statements);
 }
 
@@ -297,7 +308,7 @@ async function syncAniList(
   let browsePublished = false;
   try {
     const media = await fetchAniListSeason(target);
-    await publishBrowseSnapshot(d1, target, media, syncRunAt);
+    await publishBrowseSnapshot(d1, target, "anilist", media, syncRunAt);
     browsePublished = true;
 
     const eligibleMedia = eligibleAniListMedia(media);
@@ -321,6 +332,37 @@ async function syncAniList(
   }
 }
 
+const MAL_STATUSES: Record<string, string> = {
+  currently_airing: "RELEASING",
+  finished_airing: "FINISHED",
+  not_yet_aired: "NOT_YET_RELEASED",
+};
+
+function malBrowseMedia(item: MALAnime, target: SyncTarget): AniListMedia {
+  const date = /^(\d{4})(?:-(\d{2})(?:-(\d{2}))?)?$/.exec(item.start_date ?? "");
+  return {
+    id: item.id,
+    title: { romaji: item.title, english: item.alternative_titles.en, native: item.alternative_titles.ja },
+    coverImage: item.main_picture,
+    bannerImage: null,
+    format: item.media_type === "tv_special" ? "SPECIAL" : item.media_type?.toUpperCase() ?? "UNKNOWN",
+    status: Object.hasOwn(MAL_STATUSES, item.status) ? MAL_STATUSES[item.status]! : "UNKNOWN",
+    episodes: item.num_episodes,
+    averageScore: item.mean === null ? null : Math.round(item.mean * 10),
+    genres: item.genres.map((genre) => genre.name),
+    description: item.synopsis,
+    season: item.start_season?.season.toUpperCase() ?? target.season,
+    seasonYear: item.start_season?.year ?? target.year,
+    startDate: {
+      year: date ? Number(date[1]) : null,
+      month: date?.[2] ? Number(date[2]) : null,
+      day: date?.[3] ? Number(date[3]) : null,
+    },
+    nextAiringEpisode: null,
+    studios: { nodes: item.studios },
+  };
+}
+
 async function syncMAL(
   d1: D1Database,
   target: SyncTarget,
@@ -334,6 +376,25 @@ async function syncMAL(
       target.year,
       malClientId
     );
+    const catalog = malMedia.filter((item) => item.nsfw !== "black");
+    let anilistIds = new Map<number, number>();
+    let mappingFailed = false;
+    let mappingError: unknown;
+    try {
+      anilistIds = await getAniListIdsFromMal(catalog.map((item) => item.id));
+    } catch (error) {
+      mappingFailed = true;
+      mappingError = error;
+    }
+    await publishBrowseSnapshot(
+      d1,
+      target,
+      "mal",
+      catalog.map((item) => malBrowseMedia(item, target)),
+      syncRunAt,
+      anilistIds
+    );
+    if (mappingFailed) throw mappingError;
     const eligibleMedia = malMedia.filter((item) =>
       (item.media_type === "tv" || item.media_type === "ona") &&
       item.nsfw !== "black"

@@ -59,7 +59,8 @@ export default function AddToListModal({ anime, season, year, onClose, onAdded }
     setError("");
     try {
       await api.lists.addItem(listId, {
-        anilistId: anime.id,
+        anilistId: anime.anilistId,
+        malId: anime.malId,
         title: anime.title.romaji,
         titleEnglish: anime.title.english,
         coverImage: anime.coverImage.large,
@@ -94,7 +95,8 @@ export default function AddToListModal({ anime, season, year, onClose, onAdded }
       }
 
       await api.lists.addItem(targetList.id, {
-        anilistId: anime.id,
+        anilistId: anime.anilistId,
+        malId: anime.malId,
         title: anime.title.romaji,
         titleEnglish: anime.title.english,
         coverImage: anime.coverImage.large,
