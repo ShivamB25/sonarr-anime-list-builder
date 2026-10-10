@@ -26,10 +26,11 @@ there is no account UI or cross-device account sync.
 ### Seasonal coverage
 
 - `/api/anime/seasonal` merges independent AniList and MAL browse snapshots.
-  With `MAL_CLIENT_ID` configured, MAL contributes full card metadata for all
-  seasonal formats, including ONA, OVAs, specials, movies, and shorts. MAL can
-  refresh browsing even when AniList is blocked. Without that key, browsing
-  remains AniList-only.
+  Seasonal browsing shows TV, TV shorts, and ONA only; movies, OVAs, specials,
+  music, and unknown formats are hidden from both cards and title counts.
+  Complete provider snapshots remain stored, and existing saved lists are
+  unchanged. With `MAL_CLIENT_ID` configured, MAL refreshes browsing even when
+  AniList is blocked. Without that key, browsing remains AniList-only.
   Cards expose `source`, source-native `id`, nullable `anilistId`, and nullable
   `malId`; MAL IDs are never presented as AniList IDs. Known cross-provider
   duplicates use Fribb's verified AniList/MAL association, not title text or
@@ -51,9 +52,10 @@ there is no account UI or cross-device account sync.
   For example, MAL includes Ghost Meets Gal! (September 5) and Link Click III
   (August 14) in Fall 2026 by default; `includeContinuing=false` excludes those
   known earlier premieres. AniList does not assign them to that season.
-  Cancelled AniList entries and non-series formats are excluded from the Sonarr
-  feed, not from browse cards. MAL requests include gray-rated titles, which its
-  default API filter hides; black-rated titles remain excluded.
+  Cancelled AniList entries are excluded from the Sonarr feed; non-series
+  formats are excluded from both the seasonal browse results and the feed.
+  MAL requests include gray-rated titles, which its default API filter hides;
+  black-rated titles remain excluded.
 - Sonarr imports TVDB **series**, so multiple anime seasons can collapse to one
   `TvdbId`. Entries without a verified TVDB series ID cannot be exported.
   `TVDB_API_KEY` enables conservative fallback searches using English, Romaji,
@@ -167,6 +169,37 @@ For the self-hosted Bun runtime with local SQLite, build the client first:
 bun run build:client
 bun run dev:local
 ```
+
+### Cloudflare branch previews
+
+Cloudflare Workers Builds runs a build command and a separate deploy command.
+`bun run build` passing does not prove `npx wrangler preview` succeeded; check
+the **Workers Builds** result for the exact PR commit as well as GitHub validation.
+
+`wrangler.toml` binds branch previews to `airing-list-preview-db`, never the
+production database. All branch previews share this non-production database.
+For a branch requiring its own database, change the ID in both `wrangler.toml`
+and `wrangler.preview-migrations.toml`.
+
+Apply migrations to the preview database before deploying:
+
+```bash
+bunx wrangler d1 migrations apply PREVIEW_DB --remote --config wrangler.preview-migrations.toml
+bunx wrangler preview
+```
+
+For automated branch builds, use `bun run build` as the build command and the
+two commands above joined with `&&` as the non-production deploy command.
+The preview migration configuration contains no production database binding.
+Production continues to use `bunx wrangler deploy` and its existing migration
+procedure.
+
+The preview database starts empty. Production secrets and cron triggers are
+not inherited; configure separate preview secrets and manually sync if preview
+catalog data is needed. Do not copy production guest sessions or lists.
+Wrangler's cron-trigger limitation warning is expected and does not indicate
+a failed preview deploy. Verify `/api/health`, `/api/anime/seasonal`, and `/`
+on the emitted preview URL after deployment.
 
 ## Runtime compatibility
 

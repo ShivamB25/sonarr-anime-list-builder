@@ -63,6 +63,7 @@ anime.get("/seasonal", async (c) => {
     const mergedWhere = sql`
       ${seasonalBrowseItems.season} = ${season}
       AND ${seasonalBrowseItems.year} = ${year}
+      AND ${seasonalBrowseItems.format} IN ('TV', 'TV_SHORT', 'ONA')
       AND ${dateFilter}
       AND (
         ${seasonalBrowseItems.source} != 'anilist'
@@ -73,6 +74,7 @@ anime.get("/seasonal", async (c) => {
           WHERE mal.season = ${seasonalBrowseItems.season}
             AND mal.year = ${seasonalBrowseItems.year}
             AND mal.source = 'mal'
+            AND mal.format IN ('TV', 'TV_SHORT', 'ONA')
             AND mal.anilist_id = ${seasonalBrowseItems.anilistId}
             AND ${malDateFilter}
         )
@@ -148,7 +150,7 @@ anime.get("/seasonal", async (c) => {
   const data = cacheBust
     ? await fetchSeasonalPage()
     : await cachedWithStale(
-        `seasonal:browse:v3:${season}:${year}:${page}:${includeContinuing}`,
+        `seasonal:browse:v4:${season}:${year}:${page}:${includeContinuing}`,
         60,
         fetchSeasonalPage
       );
