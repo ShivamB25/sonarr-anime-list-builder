@@ -170,6 +170,37 @@ bun run build:client
 bun run dev:local
 ```
 
+### Cloudflare branch previews
+
+Cloudflare Workers Builds runs a build command and a separate deploy command.
+`bun run build` passing does not prove `npx wrangler preview` succeeded; check
+the **Workers Builds** result for the exact PR commit as well as GitHub validation.
+
+`wrangler.toml` binds branch previews to `airing-list-preview-db`, never the
+production database. All branch previews share this non-production database.
+For a branch requiring its own database, change the ID in both `wrangler.toml`
+and `wrangler.preview-migrations.toml`.
+
+Apply migrations to the preview database before deploying:
+
+```bash
+bunx wrangler d1 migrations apply PREVIEW_DB --remote --config wrangler.preview-migrations.toml
+bunx wrangler preview
+```
+
+For automated branch builds, use `bun run build` as the build command and the
+two commands above joined with `&&` as the non-production deploy command.
+The preview migration configuration contains no production database binding.
+Production continues to use `bunx wrangler deploy` and its existing migration
+procedure.
+
+The preview database starts empty. Production secrets and cron triggers are
+not inherited; configure separate preview secrets and manually sync if preview
+catalog data is needed. Do not copy production guest sessions or lists.
+Wrangler's cron-trigger limitation warning is expected and does not indicate
+a failed preview deploy. Verify `/api/health`, `/api/anime/seasonal`, and `/`
+on the emitted preview URL after deployment.
+
 ## Runtime compatibility
 
 | Path | Runtime | Bun-native APIs |

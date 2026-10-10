@@ -1,0 +1,6 @@
+# Keep this database aligned with previews.d1_databases in wrangler.toml.
+[[d1_databases]]
+binding = "PREVIEW_DB"
+database_name = "airing-list-preview-db"
+database_id = "2b15c2da-3ca5-4b48-88b3-b3c81a430940"
+migrations_dir = "drizzle"
