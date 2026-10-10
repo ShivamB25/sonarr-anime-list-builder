@@ -26,10 +26,11 @@ there is no account UI or cross-device account sync.
 ### Seasonal coverage
 
 - `/api/anime/seasonal` merges independent AniList and MAL browse snapshots.
-  With `MAL_CLIENT_ID` configured, MAL contributes full card metadata for all
-  seasonal formats, including ONA, OVAs, specials, movies, and shorts. MAL can
-  refresh browsing even when AniList is blocked. Without that key, browsing
-  remains AniList-only.
+  Seasonal browsing shows TV, TV shorts, and ONA only; movies, OVAs, specials,
+  music, and unknown formats are hidden from both cards and title counts.
+  Complete provider snapshots remain stored, and existing saved lists are
+  unchanged. With `MAL_CLIENT_ID` configured, MAL refreshes browsing even when
+  AniList is blocked. Without that key, browsing remains AniList-only.
   Cards expose `source`, source-native `id`, nullable `anilistId`, and nullable
   `malId`; MAL IDs are never presented as AniList IDs. Known cross-provider
   duplicates use Fribb's verified AniList/MAL association, not title text or
@@ -51,9 +52,10 @@ there is no account UI or cross-device account sync.
   For example, MAL includes Ghost Meets Gal! (September 5) and Link Click III
   (August 14) in Fall 2026 by default; `includeContinuing=false` excludes those
   known earlier premieres. AniList does not assign them to that season.
-  Cancelled AniList entries and non-series formats are excluded from the Sonarr
-  feed, not from browse cards. MAL requests include gray-rated titles, which its
-  default API filter hides; black-rated titles remain excluded.
+  Cancelled AniList entries are excluded from the Sonarr feed; non-series
+  formats are excluded from both the seasonal browse results and the feed.
+  MAL requests include gray-rated titles, which its default API filter hides;
+  black-rated titles remain excluded.
 - Sonarr imports TVDB **series**, so multiple anime seasons can collapse to one
   `TvdbId`. Entries without a verified TVDB series ID cannot be exported.
   `TVDB_API_KEY` enables conservative fallback searches using English, Romaji,
