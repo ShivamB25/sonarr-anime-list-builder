@@ -23,6 +23,7 @@ const env = {
 } satisfies AppBindings;
 
 Bun.serve({
+  idleTimeout: 255,
   port,
   async fetch(request) {
     const url = new URL(request.url);
